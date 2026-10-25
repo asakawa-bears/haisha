@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#d42a45">
+<meta name="apple-mobile-web-app-title" content="配車ボード">
+<link rel="icon" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>少年野球 配車ボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* Layout: phone-first single column. One look on every phone: deep navy "night stadium" chrome with team red as the accent; the board itself stays a white whiteboard (aluminium frame, marker rules, magnets). */
+:root{
+  --bg:#0b1220; --surface:#131c2e; --surface-2:#1a2539; --ink:#e8edf5; --muted:#93a0b8; --line:#26334d;
+  --team:#d42a45; --team-ink:#ffffff; --team-soft:#3b1d2a; --team-text:#ff6b7d;
+  --good:#4ade80; --warn:#f2b54a; --warn-soft:#3a2f17;
+  --father:#2f6fd6; --mother:#cf336a; --staff:#f2c230; --staff-ink:#3a2e00; --tool:#f28a24; --tool-ink:#3b1c00;
+  /* the whiteboard stays white, like the real board */
+  --wb:#fbfcfc; --wb-ink:#1b1f23; --wb-muted:#55606a; --wb-frame:#c5cbd1; --wb-frame-2:#98a1a9; --wb-changed:#fff1c7;
+  --f-display:"Dela Gothic One","Hiragino Kaku Gothic StdN","Yu Gothic",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--team)}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+/* iPhone: 16px+ stops the auto-zoom on focus; no inner shadow; no double-tap zoom on buttons */
+input,select,textarea{font-size:16px}
+input[type=text],input[type=date],input[type=time],textarea{-webkit-appearance:none;appearance:none}
+button{touch-action:manipulation}
+/* keyboard open: hide the bottom bar so it never covers the field */
+body.typing .tabs{display:none}
+:focus-visible{outline:2px solid var(--team);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--team);color:var(--team-ink)}
+.top-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{font-family:var(--f-display);font-size:18px;letter-spacing:.02em;line-height:1.2}
+.me{display:flex;align-items:center;gap:6px;font-size:12px}
+.me select{-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 9px center/11px 8px;color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;padding:3px 26px 3px 10px;font-size:16px;line-height:1.4;max-width:150px}
+.me select option{color:var(--ink);background:var(--surface)}
+
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px calc(96px + env(safe-area-inset-bottom,0px))}
+.stack{display:grid;gap:12px}
+.note{font-size:12px;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:8px 12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px;min-width:0}
+.sec{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.h{margin:0;font-size:17px;font-weight:700;text-wrap:balance;line-height:1.4}
+.muted{color:var(--muted);font-size:13px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--team);border-color:var(--team);color:var(--team-ink)}
+.btn.small{min-height:34px;padding:0 12px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%}
+.btn.danger{color:var(--team-text)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{min-width:56px;min-height:40px;border:none;background:none;font-weight:700;cursor:pointer;padding:0 12px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--team);color:var(--team-ink)}
+.step{display:inline-flex;align-items:center;gap:4px}
+.step button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;font-weight:700;cursor:pointer;line-height:1}
+.step output{min-width:58px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.q{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.q:first-child{border-top:none;padding-top:0}
+.q-label{font-weight:700;font-size:14px}
+.q-help{font-size:12px;color:var(--muted);margin-top:-6px}
+.sub-q{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 0}
+.toggles{display:flex;flex-wrap:wrap;gap:8px}
+.tog{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px 0 6px;border-radius:999px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500}
+.tog.off{opacity:.55;text-decoration:line-through}
+.tog .dot{width:28px;height:28px;border-radius:50%;flex:none}
+/* dark greens would sink into the navy: a faint ring keeps every grade dot visible */
+.tog .dot,.mem .dot{box-shadow:0 0 0 1.5px rgba(255,255,255,.28)}
+.tog.picked{border-color:var(--team);box-shadow:inset 0 0 0 1px var(--team)}
+textarea,input[type=text],input[type=date],input[type=time],select.input{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:8px 12px}
+textarea{min-height:88px;resize:vertical}
+label.f{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted);min-width:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+/* iPhone date/time inputs try to size themselves; keep them inside their column */
+input[type=date],input[type=time]{display:block;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left;line-height:1.4}
+input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value{text-align:left}
+@media (max-width:380px){.grid2{grid-template-columns:1fr}}
+
+.remind{white-space:pre-wrap;font-size:14px;line-height:1.6;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--team-soft);color:var(--team-text)}
+.pill.good{background:transparent;color:var(--good);border:1px solid currentColor}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.meter{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--team)}
+.namelist{display:flex;flex-wrap:wrap;gap:6px}
+.namelist span{font-size:13px;padding:2px 10px;border-radius:8px;border:1px solid var(--line)}
+.alert{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--warn-soft);border-radius:10px;padding:10px 12px;flex-wrap:wrap}
+.alert b{color:var(--warn)}
+.list{display:grid;gap:0}
+.list>div{padding:10px 0;border-top:1px solid var(--line)}
+.list>div:first-child{border-top:none}
+
+/* ---------- whiteboard ---------- */
+.board{background:var(--wb);color:var(--wb-ink);border:6px solid var(--wb-frame);border-radius:6px;box-shadow:inset 0 0 0 1px var(--wb-frame-2),0 0 0 1px var(--wb-frame-2),0 8px 24px rgba(0,0,0,.5);padding:10px 8px 8px;font-family:var(--f-body)}
+.board-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;padding:0 4px 10px}
+.bh-main{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;min-width:0}
+.bh-line{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-width:0}
+.bh-date{font-family:var(--f-display);font-size:20px;line-height:1.3;white-space:nowrap}
+.bh-time{display:inline-flex;align-items:baseline;gap:4px;font-size:17px;font-weight:700;line-height:1;padding:4px 8px 5px;border:2px solid var(--wb-ink);border-radius:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bh-time small{font-size:11px;font-weight:700;color:var(--wb-muted)}
+.bh-title{font-family:var(--f-display);font-size:20px;color:#d63a31;line-height:1.3}
+.bh-venue{display:inline-flex;align-items:center;gap:3px;font-size:15px;font-weight:700;line-height:1.3;white-space:nowrap}
+.bh-venue svg{width:14px;height:14px;flex:none}
+.bh-state{font-size:11px;font-weight:700;padding:1px 8px;border-radius:4px;border:1.5px solid currentColor;color:var(--wb-muted);white-space:nowrap;margin-top:5px}
+.bh-state.done{color:#1f7a3f}
+.bh-side{display:grid;gap:5px;justify-items:end;align-content:start}
+.bh-limit{display:grid;justify-items:center;padding:3px 6px 4px;border:1.5px solid var(--wb-ink);border-radius:6px;line-height:1.2;font-variant-numeric:tabular-nums}
+.bh-limit small{font-size:9.5px;font-weight:700;color:var(--wb-muted)}
+.bh-limit b{font-size:16px}
+.bh-limit.over{background:#c8102e;border-color:#c8102e;color:#fff}
+.bh-limit.over small{color:#fff}
+.car{display:grid;grid-template-columns:48px minmax(0,1fr);gap:6px;padding:6px 0;border-top:2.5px solid var(--wb-ink);position:relative}
+.car-head{display:flex;align-items:flex-start;justify-content:center;border-right:2.5px solid var(--wb-ink);padding:2px 6px 0 0}
+.drv .chip{width:40px;height:40px}
+.car-no{position:absolute;left:-8px;top:-8px;z-index:1;min-width:22px;height:18px;padding:0 4px;border-radius:999px;background:var(--wb-ink);color:#fff;font-size:9.5px;font-weight:700;line-height:15px;text-align:center;font-variant-numeric:tabular-nums;border:1.5px solid var(--wb);white-space:nowrap}
+.drv{position:relative;display:inline-flex}
+.car-seat{position:absolute;right:-9px;bottom:-7px;min-width:26px;text-align:center;font-size:10px;font-weight:700;line-height:14px;padding:0 4px;border-radius:999px;background:var(--wb);border:1.5px solid var(--wb-ink);color:var(--wb-ink);font-variant-numeric:tabular-nums}
+.car-seat.over{background:#c8102e;border-color:#c8102e;color:#fff}
+.car.absent{border-top-style:dashed;background:#e6e9ec;margin:0 -8px;padding-left:8px;padding-right:8px}
+.car.absent .car-head{border-right-color:#9aa2aa}
+.car-absent-label{font-size:11px;font-weight:700;color:var(--wb-muted);text-align:center;line-height:1.35}
+.chip.away{opacity:.6;cursor:default}
+.absent-none{grid-column:1/-1;font-size:12px;color:var(--wb-muted);align-self:center}
+.car-lost-label{font-size:10.5px;font-weight:700;color:#c8102e;text-align:center;line-height:1.35}
+.car-items{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;align-content:start;justify-items:start;min-width:0;min-height:40px}
+.car.changed{background:var(--wb-changed)}
+.car .tag{position:absolute;right:2px;top:4px;font-size:10px;font-weight:700;background:#a15c07;color:#fff;border-radius:4px;padding:0 6px}
+.car.drop{cursor:pointer}
+.car.drop .car-items{outline:2px dashed #c8102e;outline-offset:2px;border-radius:6px}
+.car.lost .car-head{border-right-style:dashed}
+.car.lost{background:#fdecee}
+.car-tools{display:flex;gap:6px;justify-content:flex-end;padding-top:4px;grid-column:1/-1}
+.board.cap .chip{box-shadow:none!important}
+.board.cap .chip.light{border:1px solid #93c39e}
+.board.cap .chip.driver{outline:none;border:2.5px solid #1b1f23}
+.car-x{position:absolute;left:-8px;bottom:-7px;z-index:2;width:20px;height:20px;border-radius:50%;border:1.5px solid #c8102e;background:#fff;color:#c8102e;font-size:13px;font-weight:700;line-height:1;padding:0;display:grid;place-items:center;cursor:pointer}
+.car-x::after{content:"";position:absolute;inset:-8px}
+.board .btn{background:var(--wb);color:#c8102e;border:1.5px solid #e3a3ad;min-height:30px;font-size:12px}
+.chip{width:46px;height:46px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;line-height:1.1;font-weight:700;text-align:center;border:none;padding:2px;box-shadow:0 1px 0 rgba(0,0,0,.28),inset 0 -2px 0 rgba(0,0,0,.12);cursor:default;font-family:var(--f-body);transition:transform .12s ease}
+.chip small{font-size:9px;font-weight:500;opacity:.9;margin-top:1px}
+.chip.long{font-size:10px}
+.chip.kid{border-radius:50%}
+.chip.light{box-shadow:0 1px 0 rgba(0,0,0,.28),inset 0 0 0 1px #93c39e}
+.chip.adult,.chip.staff{border-radius:8px}
+.chip.father{background:var(--father);color:#fff}
+.chip.mother{background:var(--mother);color:#fff}
+.chip.staff{background:var(--staff);color:var(--staff-ink)}
+.chip.tool,.chip.tool.long{width:98px;max-width:100%;border-radius:8px;background:var(--tool);color:var(--tool-ink);font-size:13px;letter-spacing:.1em}
+.chip.tool.square{width:46px;font-size:10px;letter-spacing:0}
+/* on the board: driver + six magnets per line on any phone width */
+.car-items .chip{width:100%;max-width:40px;height:auto;aspect-ratio:1;font-size:11px;letter-spacing:-.02em}
+.car-items .chip.long{font-size:9px}
+.car-items .chip.tool{grid-column:span 2;width:100%;max-width:84px;aspect-ratio:2.1/1;font-size:12px;letter-spacing:.1em}
+.car-items .chip.tool.square{grid-column:auto;width:100%;max-width:40px;aspect-ratio:1}
+@supports not (aspect-ratio:1){.car-items .chip,.car-items .chip.tool,.car-items .chip.tool.square{height:36px}}
+.chip.driver{outline:2.5px solid var(--wb-ink);outline-offset:2px}
+.editing .chip{cursor:pointer}
+.chip.sel{transform:translateY(-4px) scale(1.06);outline:3px solid #c8102e;outline-offset:2px}
+.editing .chip[data-k]{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.chip.dragging{opacity:.3}
+.ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:30;margin:0;transform:translate(-50%,-60%) scale(1.15);box-shadow:0 8px 18px rgba(0,0,0,.3)!important;transition:none}
+.car.over{background:#fdecee}
+.car.over .car-items{outline:2px dashed #c8102e;outline-offset:2px;border-radius:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;padding:10px 4px 0;border-top:2.5px solid var(--wb-ink);font-size:11px;color:var(--wb-muted)}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:3px}
+.legend i.c{border-radius:50%}
+.grades{display:inline-flex;gap:2px}
+.grades i{width:12px;height:12px;border-radius:50%}
+.editbar{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr,52px) + 4px);z-index:4;background:var(--team);color:var(--team-ink);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;font-weight:700}
+.editbar .btn{min-height:32px;background:rgba(0,0,0,.2);border-color:rgba(255,255,255,.5);color:#fff}
+
+/* ---------- tab bar ---------- */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+.tabs-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.tabs button{border:none;background:none;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;position:relative}
+.tabs button svg{width:22px;height:22px}
+.tabs button.on{color:var(--team-text)}
+.tabs button.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--team)}
+.tabs .badge{position:absolute;top:8px;left:calc(50% + 8px);min-width:16px;height:16px;border-radius:8px;background:var(--team);color:#fff;font-size:10px;line-height:16px;padding:0 4px}
+
+/* ---------- roster ---------- */
+.fam{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:8px}
+.fam-head{display:flex;gap:8px;align-items:center}
+.fam-head input{flex:1;min-width:0;font-weight:700}
+/* member row: name on its own line, grade + type under it; one line on wide screens */
+.mem{display:grid;grid-template-columns:20px minmax(0,1fr) minmax(0,1fr) 34px;grid-template-areas:"dot name name x" ". grade kind .";gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.mem>.dot{grid-area:dot}.mem>input{grid-area:name}.mem>select[data-k=grade]{grid-area:grade}.mem>select[data-k=kind]{grid-area:kind}.mem>.x{grid-area:x}
+@media (min-width:520px){.mem{grid-template-columns:20px minmax(0,1fr) 120px 96px 34px;grid-template-areas:"dot name grade kind x"}}
+.mem input,.mem select{min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:4px 6px;width:100%;min-width:0;font-size:16px}
+.mem .dot{width:20px;height:20px;border-radius:50%}
+.x{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
+
+.hist{display:grid;gap:0}
+.hist>div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.hist>div:first-child{border-top:none}
+.hist time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;display:block}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:20;background:rgba(10,12,14,.55);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dialog{background:var(--surface);border-radius:14px;padding:18px;max-width:420px;width:100%;display:grid;gap:14px;max-height:100%;overflow:auto}
+.dialog img{width:100%;border-radius:6px;display:block;-webkit-touch-callout:default;user-select:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:21;background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;max-width:calc(100% - 32px)}
+.empty{text-align:center;padding:28px 16px;display:grid;gap:10px;justify-items:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ---------- events (multi-event week) ---------- */
+.evtabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.evtabs::-webkit-scrollbar{display:none}
+.evtab{flex:none;display:grid;gap:1px;text-align:left;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;min-width:118px;max-width:190px}
+.evtab b{font-size:13px;line-height:1.3;font-variant-numeric:tabular-nums}
+.evtab span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.evtab i{font-style:normal;font-size:10.5px;font-weight:700;color:var(--muted)}
+.evtab i.done{color:var(--good)}
+.evtab.on{border-color:var(--team);box-shadow:inset 0 0 0 1px var(--team)}
+.evtab.on b{color:var(--team-text)}
+.evtab.add{place-items:center;align-content:center;color:var(--team-text);font-weight:700;border-style:dashed;min-width:96px}
+.evhead{display:grid;gap:2px;padding-bottom:10px;border-bottom:2px solid var(--team)}
+.evhead b{font-size:16px;line-height:1.35}
+.evhead span{font-size:12.5px;color:var(--muted)}
+.gchk{display:flex;flex-wrap:wrap;gap:6px}
+.gchk button{min-width:46px;min-height:38px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:700;cursor:pointer}
+.gchk.six{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+.gchk.six button{min-width:0;padding:0}
+.gchk button.on{background:var(--team);color:var(--team-ink);border-color:var(--team)}
+.gchk.quick button{min-height:32px;font-size:12px;font-weight:500;color:var(--muted)}
+.bh-grade{font-size:12px;font-weight:700;color:var(--wb-muted);white-space:nowrap}
+.same{justify-self:start}
+/* every list box drawn the same on every phone (no grey system style) */
+body select.input,body .mem select{-webkit-appearance:none;appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2393a0b8' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 10px center/11px 8px;padding-right:28px;color:var(--ink)}
+select.input option,.mem select option{color:var(--ink);background:var(--surface)}
+</style>
+
+</head>
+<body>
+<div id="app"></div>
+<div id="toastHost" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-25 17:00";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
+const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
+const GCOL=["#f1f9f2","#d3eed8","#a9dcb3","#7cc58b","#4a9f5d","#2a7f3f","#1c6a31","#0c4520"];
+const gInk=g=>g>=5?"#ffffff":"#1b1f23";
+const TOOL_SEATS=2; // 道具 takes the room of two people
+const gLabel=g=>(GRADES.find(x=>x.v===g)||GRADES[0]).l;
+const WD="日月火水木金土";
+const dLabel=iso=>{if(!iso)return"";const d=new Date(iso+"T00:00:00");if(isNaN(d))return iso;return `${d.getMonth()+1}月${d.getDate()}日(${WD[d.getDay()]})`};
+const dShort=iso=>{if(!iso)return"日付未定";const d=new Date(iso+"T00:00:00");if(isNaN(d))return iso;return `${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})`};
+const tLabel=t=>t?t.replace(/^0/,""):"";
+const stamp=ms=>{const d=new Date(ms);return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`};
+const gradeRange=gs=>{const g=(gs||[]).slice().sort((a,b)=>a-b);if(!g.length)return"学年未設定";if(g.join()==="1,2,3,4,5,6")return"全学年";
+  const contiguous=g.every((v,i)=>i===0||v===g[i-1]+1);return contiguous&&g.length>1?`${g[0]}〜${g[g.length-1]}年`:g.join("・")+"年"};
+
+function defaultEv(){return{absent:[],fCar:false,fSeats:5,mCar:false,mSeats:5,tools:false,fRide:false,mRide:false,siblings:[]}}
+
+/* ---------- data store ---------- */
+// Production keeps everything in Cloud Firestore (free Spark plan). Each phone signs in anonymously
+// in the background; nobody types a password. Tests swap in their own store via window.__HAISHA_TEST_STORE__.
+const FIREBASE_CONFIG={apiKey:"AIzaSyCXQqE29Mylq_i-FAYYeGnCSHTVC4wusl0",authDomain:"asakawa-bears-haisha.firebaseapp.com",projectId:"asakawa-bears-haisha",storageBucket:"asakawa-bears-haisha.firebasestorage.app",messagingSenderId:"911769874163",appId:"1:911769874163:web:de6d7434a0fc86eb84d186"};
+const FB="https://www.gstatic.com/firebasejs/10.14.1/";
+const COLS=["families","members","coaches","events","answers","alerts","config"];
+const KEEP_DAYS=30;      // events older than this drop out of the app (and out of the daily read count)
+const HIST_MAX=40;       // undo history kept
+const isoDay=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const todayISO=()=>isoDay(new Date());
+const cutoffISO=()=>{const d=new Date();d.setDate(d.getDate()-KEEP_DAYS);return isoDay(d)};
+
+async function firebaseStore(){
+  const [appMod,authMod,fs]=await Promise.all([import(FB+"firebase-app.js"),import(FB+"firebase-auth.js"),import(FB+"firebase-firestore.js")]);
+  const app=appMod.initializeApp(FIREBASE_CONFIG);
+  let db;
+  try{db=fs.initializeFirestore(app,{localCache:fs.persistentLocalCache({tabManager:fs.persistentMultipleTabManager()}),ignoreUndefinedProperties:true})}
+  catch(e){db=fs.initializeFirestore(app,{localCache:fs.memoryLocalCache(),ignoreUndefinedProperties:true})}
+  const auth=authMod.getAuth(app);
+  if(auth.authStateReady)await auth.authStateReady();
+  if(!auth.currentUser)await authMod.signInAnonymously(auth);
+  const snapDocs=snap=>snap.docs.map(d=>({id:d.id,data:d.data()}));
+  return{
+    start(onCols,onErr){
+      COLS.forEach(col=>{
+        const ref=col==="events"?fs.query(fs.collection(db,"events"),fs.where("date",">=",cutoffISO())):fs.collection(db,col);
+        fs.onSnapshot(ref,s=>onCols(col,snapDocs(s)),err=>onErr(col,err));
+      });
+    },
+    // one change = one batch (all or nothing); Firestore allows 500 writes per batch, so very large changes are split
+    commit(ops){const parts=[];for(let i=0;i<ops.length;i+=450)parts.push(ops.slice(i,i+450));
+      return Promise.all(parts.map(p=>{const b=fs.writeBatch(db);p.forEach(o=>{const r=fs.doc(db,o.col,o.id);if(o.data==null)b.delete(r);else b.set(r,o.data)});return b.commit()}))},
+    watchHistory(cb,onErr){return fs.onSnapshot(fs.query(fs.collection(db,"history"),fs.orderBy("at","desc"),fs.limit(HIST_MAX)),s=>cb(snapDocs(s)),onErr)},
+    // keep the newest entries; the database rules only allow removing entries older than a day, so the last day can always be undone
+    async trimHistory(){const s=await fs.getDocs(fs.query(fs.collection(db,"history"),fs.orderBy("at","desc"),fs.limit(HIST_MAX+100)));
+      const old=s.docs.slice(HIST_MAX).filter(d=>(d.data().at||0)<Date.now()-2*864e5);if(!old.length)return;const b=fs.writeBatch(db);old.forEach(d=>b.delete(d.ref));await b.commit()}
+  };
+}
+
+/* ---------- state ---------- */
+let D={families:[],members:[],coaches:[],events:[],answers:{},alerts:[],deadline:""},P={me:"",tab:"board",ev:""};
+try{const raw=localStorage.getItem(PREF);if(raw)P=Object.assign(P,JSON.parse(raw))}catch(e){}
+const ui={tab:P.tab||"board",ev:P.ev||"",edit:false,sel:null,ansFam:P.me||"",draft:null,modal:null,img:null,bulk:"",ready:false,loadErr:null,stale:false,dirty:false};
+let store=null,H=null,histUnsub=null,histTrimmed=false;
+const raw={};COLS.forEach(c=>raw[c]={});
+const got=new Set();
+function savePref(){try{localStorage.setItem(PREF,JSON.stringify({me:P.me,tab:ui.tab,ev:ui.ev}))}catch(e){}}
+const fam=id=>D.families.find(f=>f.id===id);
+const mem=id=>D.members.find(m=>m.id===id);
+const sortedEvents=()=>D.events.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+function curEv(){let e=D.events.find(x=>x.id===ui.ev);if(!e){e=sortedEvents()[0]||null;ui.ev=e?e.id:""}return e}
+const evName=e=>`${dShort(e.date)} ${e.title||"イベント"}`;
+const whoName=()=>{const f=fam(P.me);return f?f.name+"家":"名前未選択"};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const byOrder=(a,b)=>(a.order||0)-(b.order||0)||String(a.id).localeCompare(String(b.id));
+
+// documents in the database -> the in-memory picture the screens draw from
+function build(){
+  const list=col=>Object.entries(raw[col]).map(([id,d])=>Object.assign(clone(d),{id}));
+  const events=list("events").map(e=>{e.grades=e.grades||[];e.coaches=e.coaches||[];if(e.board){const B=e.board;B.cars=B.cars||[];B.cars.forEach(c=>c.items=c.items||[]);B.unassigned=B.unassigned||[];B.unused=B.unused||[];B.away=B.away||[];B.changed=B.changed||[]}return e});
+  const answers={};Object.entries(raw.answers).forEach(([id,a])=>{const x=clone(a);x.ev=x.ev||{};Object.values(x.ev).forEach(v=>{v.absent=v.absent||[];v.siblings=v.siblings||[]});answers[id]=x});
+  D={families:list("families").sort(byOrder),members:list("members").sort(byOrder),coaches:list("coaches").sort(byOrder),
+     events,answers,alerts:list("alerts").sort((a,b)=>(a.at||0)-(b.at||0)),deadline:(raw.config.main||{}).deadline||""};
+  heal();
+}
+// Two phones can save at the same moment (say one deletes a family while the other moves a magnet).
+// Whatever ends up saved, never let a reference to something deleted break or skew the screens:
+// a car whose family is gone hands its passengers back to "まだ乗る車なし", and unknown magnets are dropped.
+// This only tidies the picture in memory; the tidy version is what gets saved the next time that item changes.
+function heal(){
+  const fids=new Set(D.families.map(f=>f.id)),eids=new Set(D.events.map(e=>e.id)),cids=new Set(D.coaches.map(c=>c.id)),mids=new Set(D.members.map(m=>m.id));
+  D.alerts=D.alerts.filter(a=>eids.has(a.eid)&&fids.has(a.fid));
+  Object.keys(D.answers).forEach(fid=>{if(!fids.has(fid)){delete D.answers[fid];return}const ev=D.answers[fid].ev;
+    Object.keys(ev).forEach(eid=>{if(!eids.has(eid)){delete ev[eid];return}ev[eid].absent=ev[eid].absent.filter(id=>mids.has(id));ev[eid].siblings=ev[eid].siblings.filter(id=>mids.has(id))})});
+  D.events.forEach(e=>{e.coaches=e.coaches.filter(id=>cids.has(id));const B=e.board;if(!B)return;
+    const seen=new Set(),keep=k=>{if(typeof k!=="string"||seen.has(k)||!info(k))return false;seen.add(k);return true};
+    const orphans=[];B.cars=B.cars.filter(c=>{if(fids.has(c.familyId))return true;orphans.push(...c.items);return false});
+    B.cars.forEach(c=>{seen.add("a:"+c.familyId+":"+c.who)});
+    B.cars.forEach(c=>c.items=c.items.filter(keep));B.away=B.away.filter(keep);B.unassigned=B.unassigned.concat(orphans).filter(keep);
+    const used=new Set(B.cars.map(c=>c.id));B.unused=B.unused.filter(c=>fids.has(c.familyId)&&!used.has(c.id));
+    B.changed=B.changed.filter(id=>id==="removed"||used.has(id))});
+}
+// the in-memory picture -> documents (one per family, child, coach, event, family answer, alert).
+// Each document is frozen as text right away, so later edits to the screen state can never alter a recorded "before".
+function docsOf(S){const m=new Map();const put=(col,id,data)=>m.set(col+"/"+id,JSON.stringify(data));
+  S.families.forEach(f=>put("families",f.id,{name:f.name,order:f.order||0}));
+  S.members.forEach(x=>put("members",x.id,{familyId:x.familyId,name:x.name,grade:x.grade,kind:x.kind,order:x.order||0}));
+  S.coaches.forEach(c=>put("coaches",c.id,{name:c.name,order:c.order||0}));
+  S.events.forEach(e=>{const B=e.board;put("events",e.id,{date:e.date||"",time:e.time||"",venue:e.venue||"",title:e.title||"",grades:e.grades||[],coaches:e.coaches||[],
+    carLimit:e.carLimit===""||e.carLimit==null?"":+e.carLimit,confirmed:!!e.confirmed,
+    board:B?{cars:B.cars.map(c=>({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:!!c.tools,items:c.items})),unassigned:B.unassigned,unused:B.unused.map(c=>({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:!!c.tools})),away:B.away||[],changed:B.changed||[],at:B.at||0}:null})});
+  Object.entries(S.answers).forEach(([fid,a])=>put("answers",fid,{comment:a.comment||"",at:a.at||0,ev:a.ev||{}}));
+  S.alerts.forEach(a=>put("alerts",a.id,{eid:a.eid,fid:a.fid,text:a.text,at:a.at}));
+  put("config","main",{deadline:S.deadline||""});
+  return m}
+function diffOps(before,after){const ops=[],changes=[];
+  new Set([...before.keys(),...after.keys()]).forEach(k=>{const bs=before.has(k)?before.get(k):null,as=after.has(k)?after.get(k):null;
+    if(bs===as)return;const i=k.indexOf("/");const col=k.slice(0,i),id=k.slice(i+1);ops.push({col,id,data:as===null?null:JSON.parse(as)});changes.push({col,id,before:bs===null?null:JSON.parse(bs)})});
+  return{ops,changes}}
+function applyToRaw(ops){ops.forEach(o=>{if(!raw[o.col])return;if(o.data==null)delete raw[o.col][o.id];else raw[o.col][o.id]=clone(o.data)})}
+function send(ops,text,changes){
+  ops=ops.concat([{col:"history",id:uid("h"),data:{at:Date.now(),who:whoName(),text:String(text).slice(0,200),changes}}]);
+  applyToRaw(ops);
+  const slow=setTimeout(()=>toast("通信が不安定です。つながったら自動で保存されます"),6000);
+  Promise.resolve().then(()=>store.commit(ops)).then(()=>clearTimeout(slow),err=>{clearTimeout(slow);console.error(err);
+    toast(err&&err.code==="permission-denied"?"保存できませんでした（Firebaseのルール設定を確認してね）":"保存できませんでした。通信を確認して、もう一度試してね")});
+}
+function commit(text,fn,quiet){
+  const before=docsOf(D);
+  fn();
+  const{ops,changes}=diffOps(before,docsOf(D));
+  if(ops.length)send(ops,text,changes);
+  if(quiet)ui.dirty=true;else render();
+}
+function toast(msg){const h=document.getElementById("toastHost");if(!h)return;if(!msg){h.innerHTML="";return}h.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toast.t);toast.t=setTimeout(()=>{h.innerHTML=""},2200)}
+function ask(msg,okLabel,ok){ui.modal={msg,okLabel,ok};render()}
+
+// changes from other phones arrive here; they are drawn once nobody is mid-edit on this phone
+function onCols(col,docs){raw[col]={};docs.forEach(d=>raw[col][d.id]=d.data);got.add(col);
+  if(!ui.ready){if(COLS.every(c=>got.has(c))){ui.ready=true;build();render()}return}
+  ui.stale=true;if(!onCols.t)onCols.t=setTimeout(()=>{onCols.t=0;if(!busy())render()},30)}
+function onErr(col,err){console.error(col,err);if(!ui.ready){ui.loadErr=err;render()}else toast("最新の情報を読み込めませんでした。通信を確認してね")}
+// take in changes from other phones right before acting, so an action never works on an outdated picture
+function fresh(){if(ui.stale&&ui.ready){ui.stale=false;build()}}
+function busy(){const a=document.activeElement;return !!drag||!!ui.modal||!!ui.busy||(!!a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))}
+function syncHistory(){
+  if(ui.tab==="roster"&&ui.ready&&!histUnsub){H=null;histUnsub=store.watchHistory(list=>{H=list.map(d=>Object.assign({id:d.id},d.data));if(ui.tab==="roster"&&!busy())render();else ui.stale=true},err=>{console.error(err);H=[]});
+    if(!histTrimmed){histTrimmed=true;store.trimHistory().catch(()=>{})}}
+  if(ui.tab!=="roster"&&histUnsub){histUnsub();histUnsub=null;H=null}
+}
+async function boot(){
+  if(window.__HAISHA_TEST_STORE__)window.__appState=()=>({D,ui,raw});
+  render();
+  try{store=window.__HAISHA_TEST_STORE__||await firebaseStore();store.start(onCols,onErr)}
+  catch(e){console.error(e);ui.loadErr=e;render()}
+}
+
+const evAnswer=(fid,eid)=>{const a=D.answers[fid];return a&&a.ev&&a.ev[eid]?a.ev[eid]:null};
+
+/* ---------- auto assignment (one event) ---------- */
+function autoAssign(S,ev,skip){
+  skip=skip||[];
+  const fams=S.families, grades=ev.grades||[];
+  const ans=fid=>{const a=S.answers[fid];return a&&a.ev&&a.ev[ev.id]?a.ev[ev.id]:null};
+  const going={};
+  fams.forEach(f=>{
+    const a=ans(f.id); const absent=a?a.absent:[];
+    going[f.id]={
+      kids:S.members.filter(m=>m.familyId===f.id&&m.kind==="player"&&grades.includes(m.grade)&&!absent.includes(m.id)).map(m=>m.id),
+      sibs:a?a.siblings.filter(id=>S.members.some(m=>m.id===id)):[],
+      fRide:!!(a&&a.fRide), mRide:!!(a&&a.mRide)
+    };
+  });
+  const cands=[];
+  fams.forEach(f=>{const a=ans(f.id);if(!a)return;
+    if(a.fCar&&a.fSeats>=2)cands.push({id:f.id+":f",familyId:f.id,who:"f",cap:a.fSeats,tools:a.tools});
+    if(a.mCar&&a.mSeats>=2)cands.push({id:f.id+":m",familyId:f.id,who:"m",cap:a.mSeats,tools:a.tools});
+  });
+  const hasKid=c=>going[c.familyId].kids.length>0?1:0;
+  const limit=+ev.carLimit||0;
+  // with a car limit, bigger cars first so the fewest cars carry everyone
+  cands.sort(limit?((a,b)=>(b.cap-a.cap)||(hasKid(b)-hasKid(a))):((a,b)=>(hasKid(b)-hasKid(a))||(b.cap-a.cap)));
+  const coachIds=(ev.coaches||[]).filter(id=>S.coaches.some(c=>c.id===id));
+  const sel=[];
+  const drives=(fid,w)=>sel.some(c=>c.familyId===fid&&c.who===w);
+  const toolSeats=cands.some(c=>c.tools)&&!skip.includes("t:dougu")?TOOL_SEATS:0;
+  const need=()=>{let n=coachIds.length+toolSeats;fams.forEach(f=>{const g=going[f.id];n+=g.kids.length+g.sibs.length;if(g.fRide&&!drives(f.id,"f"))n++;if(g.mRide&&!drives(f.id,"m"))n++});return n};
+  const room=()=>sel.reduce((s,c)=>s+c.cap-1,0);
+  for(const c of cands){if(room()>=need()||(limit&&sel.length>=limit))break;sel.push(c)}
+  if(!sel.some(c=>c.tools)){const t=cands.find(c=>c.tools&&!sel.includes(c));if(t){if(limit&&sel.length>=limit)sel.pop();sel.push(t)}}
+  const cars=sel.map(c=>Object.assign({},c,{items:[]}));
+  const free=c=>c.cap-1-c.items.filter(k=>!k.startsWith("t:")).length-(c.items.includes("t:dougu")?TOOL_SEATS:0);
+  const gradeOf=k=>{const m=S.members.find(x=>"k:"+x.id===k);return m?m.grade:0};
+  const unitOf=f=>{const g=going[f.id];const u=[];
+    if(g.fRide&&!drives(f.id,"f"))u.push(`a:${f.id}:f`);
+    if(g.mRide&&!drives(f.id,"m"))u.push(`a:${f.id}:m`);
+    g.kids.forEach(id=>u.push("k:"+id));g.sibs.forEach(id=>u.push("k:"+id));return u.filter(k=>!skip.includes(k))};
+  // 0) tools first: 道具 uses seats, so reserve its room before placing people
+  const unassignedTools=[];
+  const tc=cars.filter(c=>c.tools);
+  // tools the coordinator moved to 欠席 stay there
+  const toolKeys=["t:dougu","t:touban"].filter(k=>!skip.includes(k));
+  if(tc.length){const d=tc.slice().sort((a,b)=>free(b)-free(a))[0];if(toolKeys.includes("t:dougu"))d.items.push("t:dougu");if(toolKeys.includes("t:touban"))(tc.find(c=>c!==d)||d).items.push("t:touban")}
+  else unassignedTools.push(...toolKeys);
+  // 1) coaches together, in the car with the most room left after its own family
+  const coachKeys=coachIds.map(id=>"c:"+id).filter(k=>!skip.includes(k));
+  if(coachKeys.length&&cars.length){
+    const own=c=>unitOf(fams.find(f=>f.id===c.familyId)).length/Math.max(1,cars.filter(x=>x.familyId===c.familyId).length);
+    const order=cars.slice().sort((a,b)=>(free(b)-own(b))-(free(a)-own(a)));
+    for(const c of order){while(coachKeys.length&&free(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
+  }
+  const unassigned=unassignedTools.concat(coachKeys);
+  // 2) own family's car
+  const rest=[];
+  fams.forEach(f=>{const items=unitOf(f);
+    cars.filter(c=>c.familyId===f.id).sort((a,b)=>free(b)-free(a)).forEach(c=>{while(items.length&&free(c)>0)c.items.push(items.shift())});
+    if(items.length){const kg=items.filter(k=>k.startsWith("k:")).map(gradeOf);rest.push({items,grade:kg.length?Math.max(...kg):0})}
+  });
+  // 3) same grade together
+  const same=(c,g)=>c.items.filter(k=>k.startsWith("k:")&&gradeOf(k)===g).length;
+  rest.sort((a,b)=>b.grade-a.grade||b.items.length-a.items.length);
+  for(const u of rest){
+    const fit=cars.filter(c=>free(c)>=u.items.length);
+    if(fit.length){fit.sort((a,b)=>same(b,u.grade)-same(a,u.grade)||free(b)-free(a));fit[0].items.push(...u.items)}
+    else for(const k of u.items){const g=k.startsWith("k:")?gradeOf(k):u.grade;
+      const f2=cars.filter(c=>free(c)>0).sort((a,b)=>same(b,g)-same(a,g)||free(b)-free(a));
+      if(f2.length)f2[0].items.push(k);else unassigned.push(k)}
+  }
+  // a parent who now drives cannot also be listed as absent / riding
+  const away=skip.filter(k=>!(k.startsWith("a:")&&drives(k.split(":")[1],k.split(":")[2])));
+  return {cars,unassigned,unused:cands.filter(c=>!sel.includes(c)),away,changed:[],at:Date.now()};
+}
+
+/* ---------- item helpers ---------- */
+function info(k){
+  if(k.startsWith("k:")){const m=mem(k.slice(2));if(!m)return null;return{type:"k",label:m.name,cls:"kid"+(m.grade<=1?" light":""),style:`background:${GCOL[m.grade]};color:${gInk(m.grade)}`,title:`${m.name}（${gLabel(m.grade)}${m.kind==="sibling"?"・兄弟児":""}）`,sort:20-m.grade}}
+  if(k.startsWith("a:")){const[,fid,w]=k.split(":");const f=fam(fid);if(!f)return null;return{type:"a",label:f.name,cls:"adult "+(w==="f"?"father":"mother"),title:`${f.name}（${w==="f"?"父":"母"}）`,sort:5}}
+  if(k.startsWith("c:")){const c=D.coaches.find(x=>x.id===k.slice(2));if(!c)return null;return{type:"c",label:c.name,cls:"staff",title:c.name,sort:0}}
+  if(k==="t:dougu")return{type:"t",label:"道具",cls:"tool",title:"道具（2人分の席を使う）",sort:99};
+  if(k==="t:touban")return{type:"t",label:"当番道具",cls:"tool square",title:"当番道具",sort:99};
+  return null;
+}
+const short=l=>{const c=[...l];return c.length>4?c.slice(0,3).join("")+"…":l};
+function chip(k){const i=info(k);if(!i)return"";
+  const long=[...short(i.label)].length>=4?" long":"";
+  const sel=ui.sel===k?" sel":"";
+  return `<button class="chip ${i.cls}${long}${sel}" ${i.style?`style="${i.style}"`:""} data-act="chip" data-k="${esc(k)}" title="${esc(i.title)}" aria-label="${esc(i.title)}" ${ui.edit?"":"tabindex=\"-1\""}>${esc(short(i.label))}</button>`;
+}
+function staticChip(k){const i=info(k);if(!i)return"";const long=[...i.label].length>=4?" long":"";
+  return `<span class="chip ${i.cls}${long} away" ${i.style?`style="${i.style}"`:""} title="${esc(i.title)}（欠席）">${esc(i.label)}</span>`}
+function missingKeys(E){const B=E.board;if(!B)return[];
+  const on=new Set(B.unassigned.concat(B.away||[],...B.cars.map(c=>c.items)));
+  const kids=D.members.filter(m=>m.kind==="player"&&(E.grades||[]).includes(m.grade)&&!((evAnswer(m.familyId,E.id)||{absent:[]}).absent.includes(m.id))).map(m=>"k:"+m.id);
+  return (E.coaches||[]).map(id=>"c:"+id).concat(kids).filter(k=>!on.has(k)&&info(k))}
+function absentRow(E){
+  const kids=D.members.filter(m=>m.kind==="player"&&(!(E.grades||[]).includes(m.grade)||((evAnswer(m.familyId,E.id)||{absent:[]}).absent.includes(m.id)))).sort((a,b)=>b.grade-a.grade);
+  const coaches=D.coaches.filter(c=>!(E.coaches||[]).includes(c.id));
+  const B=E.board||{cars:[],unassigned:[],away:[]};
+  const onBoard=new Set(B.unassigned.concat(...B.cars.map(c=>c.items)));
+  // from the answers + anyone the coordinator dragged here; minus anyone placed in a car
+  const keys=[...new Set(coaches.map(c=>"c:"+c.id).concat(kids.map(m=>"k:"+m.id),B.away||[]))].filter(k=>!onBoard.has(k)&&info(k));
+  const drop=ui.edit&&ui.sel&&!keys.includes(ui.sel);
+  return `<div class="car absent${drop?" drop":""}" data-act="drop" data-car="away"><div class="car-head"><span class="car-absent-label">欠席<br>${keys.length}人</span></div><div class="car-items">${keys.length?keys.map(chip).join(""):`<span class="absent-none">なし</span>`}</div></div>`}
+const carName=c=>{const f=fam(c.familyId);return `${f?f.name:"?"}${c.who==="f"?"父号":"母号"}`};
+const used=c=>1+c.items.filter(k=>!k.startsWith("t:")).length+(c.items.includes("t:dougu")?TOOL_SEATS:0);
+function prune(){
+  const ok=k=>!!info(k);
+  D.events.forEach(ev=>{ev.coaches=(ev.coaches||[]).filter(id=>D.coaches.some(c=>c.id===id));const B=ev.board;if(!B)return;
+    B.cars=B.cars.filter(c=>fam(c.familyId));B.cars.forEach(c=>c.items=c.items.filter(ok));
+    B.unassigned=B.unassigned.filter(ok);B.away=(B.away||[]).filter(ok);B.unused=B.unused.filter(c=>fam(c.familyId))});
+  Object.keys(D.answers).forEach(fid=>{if(!fam(fid)){delete D.answers[fid];return}const a=D.answers[fid];
+    Object.keys(a.ev).forEach(eid=>{if(!D.events.some(e=>e.id===eid)){delete a.ev[eid];return}const x=a.ev[eid];x.absent=x.absent.filter(id=>mem(id));x.siblings=x.siblings.filter(id=>mem(id))})});
+  D.alerts=D.alerts.filter(a=>D.events.some(e=>e.id===a.eid));
+}
+
+/* ---------- views ---------- */
+const ICON={
+  board:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="1.5"/><path d="M3 9h18M8 9v9"/><path d="M9 21h6"/></svg>',
+  answer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+  admin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 16l1.5-5a2 2 0 0 1 2-1.4h7a2 2 0 0 1 2 1.4L19 16"/><rect x="3" y="16" width="18" height="4" rx="1"/><circle cx="7.5" cy="20" r="1.2"/><circle cx="16.5" cy="20" r="1.2"/></svg>',
+  roster:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c.6-3.4 3-5 6-5s5.4 1.6 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.4.2 4.2 1.6 5 4.8"/></svg>'
+};
+function header(){
+  if(!ui.ready)return `<header class="top"><div class="top-inner"><div class="brand">配車ボード</div></div></header>`;
+  const opts=D.families.map(f=>`<option value="${f.id}" ${P.me===f.id?"selected":""}>${esc(f.name)}家</option>`).join("");
+  return `<header class="top"><div class="top-inner"><div class="brand">配車ボード</div>
+  <label class="me">あなた<select id="me" data-ch="me" aria-label="操作する人"><option value="">選んでね</option>${opts}</select></label></div></header>`;
+}
+function tabs(){
+  const t=[["board","ボード"],["answer","回答する"],["admin","配車係"],["roster","名簿"]];
+  const n=D.alerts.length;
+  return `<nav class="tabs"><div class="tabs-inner">${t.map(([k,l])=>`<button class="${ui.tab===k?"on":""}" data-act="tab" data-v="${k}">${ICON[k]}${l}${k==="admin"&&n?`<span class="badge">${n}</span>`:""}</button>`).join("")}</div></nav>`;
+}
+function evTabs(withAdd){
+  const cur=curEv();
+  return `<div class="evtabs" role="tablist">${sortedEvents().map(e=>{const st=!e.board?"未作成":e.confirmed?(e.board.changed.length?"変更あり":"確定"):"下書き";
+    return `<button class="evtab${cur&&cur.id===e.id?" on":""}" role="tab" aria-selected="${cur&&cur.id===e.id}" data-act="pickEv" data-id="${e.id}"><b>${esc(dShort(e.date))}</b><span>${esc(e.title||"イベント")}</span><i class="${st==="確定"?"done":""}">${gradeRange(e.grades)}・${st}</i></button>`}).join("")}
+    ${withAdd?`<button class="evtab add" data-act="addEv">＋ イベント</button>`:""}</div>`;
+}
+function boardHTML(E){
+  const B=E.board;
+  const order=k=>(info(k)||{sort:50}).sort;
+  const rows=B.cars.map((c,ci)=>{
+    const f=fam(c.familyId);const u=used(c);
+    const people=c.items.filter(k=>!k.startsWith("t:")).sort((a,b)=>order(a)-order(b));
+    const tools=c.items.filter(k=>k.startsWith("t:"));
+    const ch=B.changed.includes(c.id);
+    const drop=ui.edit&&ui.sel&&!c.items.includes(ui.sel);
+    return `<div class="car${ch?" changed":""}${drop?" drop":""}" data-act="drop" data-car="${c.id}">
+      ${ch?'<span class="tag">変更</span>':""}
+      <div class="car-head"><span class="drv"><span class="car-no">${ci+1}号</span>
+        <span class="chip adult ${c.who==="f"?"father":"mother"} driver${[...short(f.name)].length>=4?" long":""}" title="${esc(carName(c))}（運転）">${esc(short(f.name))}</span>
+        <span class="car-seat${u>c.cap?" over":""}" title="乗車${u}人／定員${c.cap}人">${u}/${c.cap}</span>${ui.edit?`<button class="car-x" data-act="removeCar" data-car="${c.id}" aria-label="${esc(carName(c))}を外す" title="この車を外す">×</button>`:""}
+      </span></div>
+      <div class="car-items">${people.map(chip).join("")}${tools.map(chip).join("")}</div>
+    </div>`}).join("");
+  const lostKeys=B.unassigned.concat(missingKeys(E));
+  const lost=lostKeys.length||ui.edit?`<div class="car lost${ui.edit&&ui.sel&&!lostKeys.includes(ui.sel)?" drop":""}" data-act="drop" data-car="un">
+      <div class="car-head"><span class="car-lost-label">まだ<br>乗る車<br>なし<br>${lostKeys.filter(k=>!k.startsWith("t:")).length}人</span></div>
+      <div class="car-items">${lostKeys.map(chip).join("")}</div></div>`:"";
+  const legend=`<div class="legend"><span><i style="background:var(--father)"></i>父</span><span><i style="background:var(--mother)"></i>母</span><span><i style="background:var(--staff)"></i>指導者</span><span><i style="background:var(--tool);width:22px"></i>道具</span><span><span class="grades">${[7,6,5,4,3,2,1,0].map(g=>`<i style="background:${GCOL[g]};${g<=1?"border:1px solid #93c39e":""}"></i>`).join("")}</span>子ども（中学以上→未就学）</span><span>四角＝大人／丸＝子ども</span><span>太枠＝運転手</span><span>右下の数字＝乗車人数／定員</span></div>`;
+  const over=E.carLimit&&B.cars.length>E.carLimit;
+  return `<div class="board${ui.edit?" editing":""}" id="board">
+    <div class="board-head">
+      <div class="bh-main">
+        <span class="bh-line"><span class="bh-date">${esc(dLabel(E.date))}</span><span class="bh-time"><small>集合</small>${esc(tLabel(E.time))}</span></span>
+        <span class="bh-line"><span class="bh-title">${esc(E.title)}</span>${E.venue?`<span class="bh-venue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>${esc(E.venue)}</span>`:""}<span class="bh-grade">${esc(gradeRange(E.grades))}</span></span>
+      </div>
+      <div class="bh-side"><span class="bh-state${E.confirmed?" done":""}">${E.confirmed?"確定":"下書き"}</span>${E.carLimit?`<span class="bh-limit${over?" over":""}" title="配車制限 ${E.carLimit}台"><small>配車制限</small><b>${E.carLimit}台</b>${over?`<small>今${B.cars.length}台</small>`:""}</span>`:""}</div>
+    </div>${rows}${lost}${absentRow(E)}${legend}</div>`;
+}
+function noRoster(){return `<div class="card empty"><p class="h">まだ名簿がありません</p><p class="muted">最初に「名簿」で家庭と子どもを登録してね。Excelの名簿を「まとめて登録」に貼り付けると早いよ。</p><button class="btn primary" data-act="tab" data-v="roster">名簿のページへ</button></div>`}
+function viewBoard(){
+  if(!D.families.length)return noRoster();
+  const E=curEv();
+  if(!E)return `<div class="card empty"><p class="h">イベントがありません</p><p class="muted">配車係のページでイベントを追加してね。</p><button class="btn primary" data-act="tab" data-v="admin">配車係のページへ</button></div>`;
+  const head=`${ui.edit?"":evTabs(false)}`;
+  if(!E.board)return `<div class="stack">${head}<div class="card empty"><p class="h">${esc(evName(E))}の配車はまだありません</p><p class="muted">配車係のページで「自動で割り振る」を押すと、回答からボードが作られます。</p><button class="btn primary" data-act="tab" data-v="admin">配車係のページへ</button></div></div>`;
+  if(ui.sel&&(!info(ui.sel)||!onBoard(E,ui.sel)))ui.sel=null;
+  const editbar=ui.edit?`<div class="editbar"><span>${ui.sel?`「${esc(info(ui.sel).label)}」を乗せる車をタップ`:"人をドラッグして乗せたい車へ（×で車を外す）"}</span><button class="btn small" data-act="editToggle">手直しを終える</button></div>`:"";
+  return `<div class="stack">${head}
+    ${editbar}${boardHTML(E)}
+    ${ui.edit?"":`<div class="btns"><button class="btn primary" data-act="saveImg">画像にしてLINEに貼る</button><button class="btn" data-act="editToggle">手直しする</button></div>`}
+    ${ui.edit&&E.board.unused.length?`<div class="card"><p class="sec">使っていない車</p>${E.board.unused.map(c=>`<div class="row" style="flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc(carName(c))}（${c.cap}人乗り${c.tools?"・道具OK":""}）</span><button class="btn small" style="flex:none" data-act="useCar" data-car="${c.id}">この車も使う</button></div>`).join("")}</div>`:""}
+  </div>`;
+}
+function seg(eid,k,v){return `<div class="seg" role="group"><button class="${v?"on":""}" data-act="setDraft" data-ev="${eid}" data-k="${k}" data-v="1" aria-pressed="${v}">○</button><button class="${!v?"on":""}" data-act="setDraft" data-ev="${eid}" data-k="${k}" data-v="0" aria-pressed="${!v}">×</button></div>`}
+function stepper(eid,k,v){return `<div class="step"><button data-act="seat" data-ev="${eid}" data-k="${k}" data-d="-1" aria-label="1人減らす">−</button><output>${v}人</output><button data-act="seat" data-ev="${eid}" data-k="${k}" data-d="1" aria-label="1人増やす">＋</button></div>`}
+function evForm(fid,e,i,a){
+  const kids=D.members.filter(m=>m.familyId===fid&&m.kind==="player"&&(e.grades||[]).includes(m.grade));
+  const sibs=D.members.filter(m=>m.familyId===fid&&m.kind==="sibling");
+  const sameDay=sortedEvents().filter(x=>x.date===e.date&&x.id!==e.id);
+  return `<div class="card">
+    <div class="evhead"><b>${esc(dLabel(e.date))} ${esc(e.title)}</b><span>${esc(e.venue)}・集合 ${esc(tLabel(e.time))}・${esc(gradeRange(e.grades))}</span></div>
+    ${i>0?`<button class="btn small same" data-act="copyPrev" data-ev="${e.id}" data-i="${i}">上のイベントと同じ回答にする</button>`:""}
+    <div class="q"><span class="q-label">① 子どもの参加</span>${kids.length?`<span class="q-help">休む子だけタップしてね</span>
+      <div class="toggles">${kids.map(m=>{const off=a.absent.includes(m.id);return `<button class="tog${off?" off":""}" data-act="kid" data-ev="${e.id}" data-id="${m.id}" aria-pressed="${!off}"><span class="dot" style="background:${GCOL[m.grade]}"></span>${esc(m.name)}・${off?"不参加":"参加"}</button>`}).join("")}</div>`:`<span class="q-help" style="margin-top:0">対象学年の子どもはいません。車出し・同行だけ答えてね</span>`}</div>
+    <div class="q"><span class="q-label">② 車を出せる？</span><span class="q-help">乗れる人数は運転手を含めた人数${sameDay.length?"。同じ日に別のイベントもあるので注意してね":""}</span>
+      <div class="sub-q"><span>父号</span>${seg(e.id,"fCar",a.fCar)}</div>${a.fCar?`<div class="sub-q"><span class="muted">父号の人数</span>${stepper(e.id,"fSeats",a.fSeats)}</div>`:""}
+      <div class="sub-q"><span>母号</span>${seg(e.id,"mCar",a.mCar)}</div>${a.mCar?`<div class="sub-q"><span class="muted">母号の人数</span>${stepper(e.id,"mSeats",a.mSeats)}</div>`:""}
+    </div>
+    ${a.fCar||a.mCar?`<div class="q"><div class="sub-q" style="padding:0"><span class="q-label">③ 道具を積める？</span>${seg(e.id,"tools",a.tools)}</div><span class="q-help" style="margin-top:0">道具を積むと2人分の席を使います</span></div>`:""}
+    <div class="q"><span class="q-label">④ 配車にならなくても一緒に行く人</span>
+      <div class="sub-q"><span>父</span>${seg(e.id,"fRide",a.fRide)}</div>
+      <div class="sub-q"><span>母</span>${seg(e.id,"mRide",a.mRide)}</div>
+      ${sibs.length?`<span class="q-help" style="margin-top:4px">一緒に行く兄弟児をタップ</span><div class="toggles">${sibs.map(m=>{const on=a.siblings.includes(m.id);return `<button class="tog${on?" picked":""}" data-act="sib" data-ev="${e.id}" data-id="${m.id}" aria-pressed="${on}"><span class="dot" style="background:${GCOL[m.grade]};${m.grade<=1?"box-shadow:inset 0 0 0 1px #93c39e":""}"></span>${esc(m.name)}（${gLabel(m.grade)}）</button>`}).join("")}</div>`:""}
+    </div>
+  </div>`;
+}
+function evDraft(cur,eid){return Object.assign(defaultEv(),cur&&cur.ev&&cur.ev[eid]?JSON.parse(JSON.stringify(cur.ev[eid])):{})}
+function viewAnswer(){
+  if(!D.families.length)return noRoster();
+  const evs=sortedEvents();
+  const fid=ui.ansFam;
+  const sel=`<select class="input" data-ch="ansFam" id="ansFam" aria-label="家庭を選ぶ"><option value="">家庭を選んでね</option>${D.families.map(f=>`<option value="${f.id}" ${fid===f.id?"selected":""}>${esc(f.name)}家${D.answers[f.id]?"（回答済み）":""}</option>`).join("")}</select>`;
+  let body="";
+  if(fid&&fam(fid)&&evs.length){
+    if(!ui.draft||ui.draft._fid!==fid)ui.draft={_fid:fid,comment:"",ev:{},_base:{comment:null,ev:{}}};
+    const a=ui.draft,cur=D.answers[fid];
+    // untouched parts of the draft follow the latest saved answer (e.g. the other parent just answered)
+    evs.forEach(e=>{if(!a.ev[e.id]||JSON.stringify(a.ev[e.id])===a._base.ev[e.id]){a.ev[e.id]=evDraft(cur,e.id);a._base.ev[e.id]=JSON.stringify(a.ev[e.id])}});
+    if(a._base.comment===null||a.comment===a._base.comment){a.comment=cur?cur.comment||"":"";a._base.comment=a.comment}
+    body=evs.map((e,i)=>evForm(fid,e,i,a.ev[e.id])).join("")+`<div class="card">
+      <div class="q"><label class="q-label" for="comment">⑤ その他連絡</label><textarea id="comment" data-in="comment" maxlength="500" placeholder="例：〇〇は午後から合流します">${esc(a.comment)}</textarea></div>
+      <button class="btn primary wide" data-act="saveAnswer">${D.answers[fid]?"回答を更新する":"この内容で回答する"}</button>
+      ${D.answers[fid]&&D.answers[fid].at?`<p class="muted" style="margin:0;text-align:center">前回の回答：${stamp(D.answers[fid].at)}</p>`:""}
+    </div>`;
+  }
+  return `<div class="stack">
+    <div class="card"><p class="sec">配車アンケート</p><p class="h">${evs.length?`${esc(dShort(evs[0].date))}〜${esc(dShort(evs[evs.length-1].date))}の${evs.length}イベント`:"イベントがありません"}</p>
+      <p class="muted" style="margin:0">イベントごとに答えてね。回答締切 <b>${D.deadline?esc(dLabel(D.deadline)):"未設定"}</b>（締切後も変更できます）</p>${sel}</div>
+    ${body}</div>`;
+}
+function viewAdmin(){
+  const E=curEv();
+  const answered=D.families.filter(f=>D.answers[f.id]);
+  const not=D.families.filter(f=>!D.answers[f.id]);
+  const pct=D.families.length?Math.round(answered.length/D.families.length*100):0;
+  const comments=D.families.filter(f=>D.answers[f.id]&&D.answers[f.id].comment);
+  const alerts=D.alerts.length?`<div class="card"><div class="row"><p class="sec">要対応</p><span class="pill warn">${D.alerts.length}件</span></div>
+    ${D.alerts.map((a,i)=>`<div class="alert"><span><b>${esc(a.text)}</b><br><span class="muted">${stamp(a.at)}</span></span><span class="btns"><button class="btn small" data-act="goEdit" data-id="${a.eid}">ボードを手直し</button><button class="btn small" data-act="alertDone" data-id="${esc(a.id)}">対応済み</button></span></div>`).join("")}</div>`:"";
+  const quick=[["全学年",[1,2,3,4,5,6]],["高学年 4〜6年",[4,5,6]],["低学年 1〜3年",[1,2,3]]];
+  const evCard=E?`<div class="card"><p class="sec">${esc(evName(E))}の設定</p>
+      <div class="grid2"><label class="f">日付<input type="date" id="evDate" data-ch="ev" data-eid="${E.id}" data-k="date" min="${cutoffISO()}" value="${esc(E.date)}"></label><label class="f">集合時間<input type="time" id="evTime" data-ch="ev" data-eid="${E.id}" data-k="time" value="${esc(E.time)}"></label></div>
+      <label class="f">会場<input type="text" id="evVenue" maxlength="30" data-ch="ev" data-eid="${E.id}" data-k="venue" value="${esc(E.venue)}"></label>
+      <label class="f">イベント名<input type="text" id="evTitle" maxlength="30" data-ch="ev" data-eid="${E.id}" data-k="title" value="${esc(E.title)}"></label>
+      <div class="f" style="display:grid;gap:6px"><span class="q-label" style="font-size:13px;color:var(--muted)">対象学年</span>
+        <div class="gchk six">${[1,2,3,4,5,6].map(g=>`<button class="${(E.grades||[]).includes(g)?"on":""}" data-act="grade" data-g="${g}" aria-pressed="${(E.grades||[]).includes(g)}">${g}年</button>`).join("")}</div>
+        <div class="gchk quick">${quick.map(([l,gs])=>`<button data-act="gradeSet" data-g="${gs.join(",")}">${l}</button>`).join("")}</div></div>
+      <div class="f" style="display:grid;gap:6px"><span class="q-label" style="font-size:13px;color:var(--muted)">来る指導者（欠席の人は外してね）</span>
+        <div class="gchk">${D.coaches.map(c=>{const on=(E.coaches||[]).includes(c.id);return `<button class="${on?"on":""}" data-act="coachPick" data-id="${c.id}" aria-pressed="${on}">${esc(c.name)}</button>`}).join("")||`<span class="muted">名簿に指導者がいません</span>`}</div></div>
+      <label class="f">配車制限台数<input type="text" inputmode="numeric" id="evLimit" data-ch="ev" data-eid="${E.id}" data-k="carLimit" value="${E.carLimit||""}" placeholder="空欄＝制限なし"></label>
+      <button class="btn small danger" data-act="delEv" style="justify-self:start">このイベントを削除</button>
+    </div>
+    <div class="card"><p class="sec">${esc(evName(E))}の配車</p>
+      <p class="muted" style="margin:0">このイベントに回答済み：<b>${D.families.filter(f=>evAnswer(f.id,E.id)).length}/${D.families.length}家庭</b>（イベントを後から追加したときは、回答し直してもらってね）</p>
+      <p class="muted" style="margin:0">指導者は同じ車 → 自分の家庭の車 → 同じ学年、の順で自動で組みます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
+      ${E.board&&E.carLimit&&E.board.cars.length>E.carLimit?`<p class="pill" style="justify-self:start">配車制限を${E.board.cars.length-E.carLimit}台オーバーしています</p>`:""}
+      <button class="btn primary wide" data-act="auto">${E.board?"回答から自動で割り振り直す":"回答から自動で割り振る"}</button>
+      ${E.board?`<div class="btns"><button class="btn" data-act="goEdit" data-id="${E.id}" style="flex:1">ボードを手直し</button><button class="btn" data-act="confirm" style="flex:1" ${E.confirmed&&!E.board.changed.length?"disabled":""}>${E.confirmed?(E.board.changed.length?"変更を確定":"確定済み"):"配車を確定"}</button></div>
+      ${E.board.unassigned.length+missingKeys(E).length?`<p class="pill" style="justify-self:start">乗る車がない人・物 ${E.board.unassigned.length+missingKeys(E).length}件</p>`:""}`:""}
+    </div>`:`<div class="card empty"><p class="h">イベントがありません</p><button class="btn primary" data-act="addEv">＋ イベントを追加</button></div>`;
+  return `<div class="stack">
+    ${alerts}
+    <div class="card"><div class="row"><p class="sec">アンケート回答状況</p><span class="pill${not.length?"":" good"}">${answered.length}/${D.families.length}家庭</span></div>
+      <div class="meter"><i style="width:${pct}%"></i></div>
+      <label class="f">回答締切<input type="date" id="deadline" data-ch="deadline" value="${esc(D.deadline)}"></label>
+      ${not.length?`<div><p class="muted" style="margin:0 0 6px">まだ回答していない家庭</p><div class="namelist">${not.map(f=>`<span>${esc(f.name)}家</span>`).join("")}</div></div>
+      <button class="btn" data-act="copyRemind">リマインド文をコピー</button><div id="remindText" class="remind" aria-label="リマインド文">${esc(remindText(not))}</div>`:`<p class="muted" style="margin:0">全家庭が回答済み</p>`}
+    </div>
+    ${comments.length?`<div class="card"><p class="sec">その他連絡</p><div class="list">${comments.map(f=>`<div><b>${esc(f.name)}家</b><br><span style="font-size:14px">${esc(D.answers[f.id].comment)}</span></div>`).join("")}</div></div>`:""}
+    <div class="row" style="margin-top:4px"><p class="sec">イベント（${D.events.length}件）</p><button class="btn small" data-act="addEv">＋ イベントを追加</button></div>
+    ${evTabs(false)}
+    ${evCard}
+  </div>`;
+}
+function remindText(not){const evs=sortedEvents();return `【配車アンケート】${evs.map(e=>`${dShort(e.date)} ${e.title}`).join("／")}\nまだ回答していない家庭：${not.map(f=>f.name+"家").join("、")}\n${D.deadline?`締切は${dLabel(D.deadline)}です。`:""}アプリから回答お願いします！`}
+function gradeSelect(m){return `<select data-ch="mem" data-id="${m.id}" data-k="grade" aria-label="${esc(m.name)}の学年">${GRADES.map(g=>`<option value="${g.v}" ${m.grade===g.v?"selected":""}>${g.l}</option>`).join("")}</select>`}
+function viewRoster(){
+  const famHTML=D.families.map(f=>{
+    const ms=D.members.filter(m=>m.familyId===f.id);
+    return `<div class="fam"><div class="fam-head"><input type="text" id="fn-${f.id}" value="${esc(f.name)}" data-ch="famName" data-id="${f.id}" maxlength="10" aria-label="家庭名"><span class="muted">家</span><button class="x" data-act="delFam" data-id="${f.id}" aria-label="${esc(f.name)}家を削除">×</button></div>
+      ${ms.map(m=>`<div class="mem"><span class="dot" style="background:${GCOL[m.grade]};${m.grade<=1?"box-shadow:inset 0 0 0 1px #93c39e":""}"></span><input type="text" id="mn-${m.id}" value="${esc(m.name)}" data-ch="mem" data-id="${m.id}" data-k="name" maxlength="10" aria-label="名前">${gradeSelect(m)}<select data-ch="mem" data-id="${m.id}" data-k="kind" aria-label="区分"><option value="player" ${m.kind==="player"?"selected":""}>選手</option><option value="sibling" ${m.kind==="sibling"?"selected":""}>兄弟児</option></select><button class="x" data-act="delMem" data-id="${m.id}" aria-label="${esc(m.name)}を削除">×</button></div>`).join("")}
+      <button class="btn small" data-act="addMem" data-id="${f.id}" style="justify-self:start">＋ 子どもを追加</button></div>`}).join("");
+  const hist=(H||[]).slice(0,20).map(h=>`<div><span><time>${stamp(h.at)}・${esc(h.who)}</time>${esc(h.text)}</span><button class="btn small" data-act="restore" data-id="${esc(h.id)}">この前に戻す</button></div>`).join("");
+  return `<div class="stack">
+    <div class="card"><p class="sec">家庭と子ども</p><p class="muted" style="margin:0">誰でも修正できます。変更は下の履歴に残り、元に戻せます。</p>${famHTML}
+      <button class="btn" data-act="addFam">＋ 家庭を追加</button></div>
+    <div class="card"><p class="sec">指導者</p>${D.coaches.map(c=>`<div class="fam-head"><span class="chip staff" style="width:34px;height:34px;font-size:10px"> </span><input type="text" id="cn-${c.id}" value="${esc(c.name)}" data-ch="coach" data-id="${c.id}" maxlength="10" aria-label="指導者名" style="min-height:40px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--surface)"><button class="x" data-act="delCoach" data-id="${c.id}" aria-label="${esc(c.name)}を削除">×</button></div>`).join("")}
+      <button class="btn small" data-act="addCoach" style="justify-self:start">＋ 指導者を追加</button></div>
+    <div class="card"><p class="sec">4月の学年繰り上げ</p><p class="muted" style="margin:0">1〜6年の子を全員1学年上げます（6年は中学以上へ）。未就学の子は入学したら手で変えてね。</p><button class="btn" data-act="gradeUp">全員の学年を1つ上げる</button></div>
+    <div class="card"><p class="sec">まとめて登録</p><p class="muted" style="margin:0">1行に「家庭名,子どもの名前,学年,区分」。Excelからの貼り付けもOK。<br>例：下澤,想太,5,選手／下澤,結,未就学,兄弟児</p>
+      <textarea id="bulk" data-in="bulk" placeholder="下澤,想太,5,選手">${esc(ui.bulk)}</textarea><button class="btn" data-act="bulk">登録する</button></div>
+    <div class="card"><p class="sec">変更履歴</p>${H===null?`<p class="muted" style="margin:0">読み込み中…</p>`:hist?`<div class="hist">${hist}</div>`:`<p class="muted" style="margin:0">まだ変更はありません</p>`}</div><p class="muted" style="margin:0;text-align:center;font-size:12px">アプリの版：${APP_VERSION}</p>
+  </div>`;
+}
+function overlays(){
+  let h="";
+  if(ui.modal)h+=`<div class="overlay" data-act="modalCancel"><div class="dialog" role="dialog" aria-modal="true" data-act="noop"><p style="margin:0;font-weight:700;white-space:pre-line">${esc(ui.modal.msg)}</p><div class="btns" style="justify-content:flex-end"><button class="btn" data-act="modalCancel">やめる</button><button class="btn primary" data-act="modalOk">${esc(ui.modal.okLabel)}</button></div></div></div>`;
+  if(ui.img)h+=`<div class="overlay" data-act="closeImg"><div class="dialog" data-act="noop"><p style="margin:0;font-weight:700">画像を長押しして「写真に保存」→ LINEに貼ってね</p><p class="muted" style="margin:0">長押しで保存できないときは、この画面のスクリーンショットでもOK</p><img src="${ui.img}" alt="配車ボードの画像"><button class="btn" data-act="closeImg">閉じる</button></div></div>`;
+  return h;
+}
+// hide the bottom bar while the keyboard is up (also works on older iPhones without :has)
+const touchOnly=(()=>{try{return matchMedia("(pointer:coarse)").matches}catch(e){return false}})();
+const isControl=el=>!!el&&/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName);
+const isTextField=el=>!!el&&(el.tagName==="TEXTAREA"||(el.tagName==="INPUT"&&el.type==="text"));
+function syncTyping(){const a=document.activeElement;document.body.classList.toggle("typing",touchOnly&&!!a&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&!["button","checkbox","radio"].includes(a.type)))&&!a.readOnly)}
+document.addEventListener("focusin",()=>syncTyping());
+document.addEventListener("focusout",()=>{setTimeout(syncTyping,0);
+  // a field was saved quietly: refresh the page once the person has left the fields (and no tap is about to land)
+  setTimeout(()=>{if((ui.dirty||ui.stale)&&!drag&&!ui.modal&&!isControl(document.activeElement))render()},300)});
+function loadingView(){
+  const e=ui.loadErr;
+  if(!e)return `<main class="wrap"><div class="card empty" style="margin-top:24px"><p class="h">読み込み中…</p><p class="muted">はじめて開くときは少し時間がかかります</p></div></main>`;
+  const code=String(e&&e.code||"");const perm=code==="permission-denied";const auth=code.startsWith("auth/")&&code!=="auth/network-request-failed";
+  const [h,m]=perm?["データを読み込めませんでした","Firebaseのルール設定がまだかもしれません。父母会長に知らせてね。"]
+    :auth?["ログインの設定に問題があります","Firebaseの匿名ログインが有効になっているか、父母会長に知らせてね。"]
+    :["インターネットにつながりません","電波のよいところで、もう一度開いてね。"];
+  return `<main class="wrap"><div class="card empty" style="margin-top:24px"><p class="h">${h}</p><p class="muted">${m}</p><button class="btn primary" data-act="reload">もう一度読み込む</button><p class="muted" style="margin:0;font-size:12px">${esc(code||String(e&&e.message||e).slice(0,80))}</p></div></main>`;
+}
+function render(){
+  const y=window.scrollY;
+  ui.dirty=false;
+  if(!ui.ready){document.getElementById("app").innerHTML=header()+loadingView();return}
+  if(ui.stale&&!busy()){ui.stale=false;build()}
+  if(P.me&&!fam(P.me)){P.me="";savePref()}
+  syncHistory();
+  const ae=document.activeElement;const fid=isTextField(ae)&&ae.id?ae.id:null;
+  let ss=null,se=null;try{if(fid&&ae.type==="text"){ss=ae.selectionStart;se=ae.selectionEnd}}catch(e){}
+  const v={board:viewBoard,answer:viewAnswer,admin:viewAdmin,roster:viewRoster}[ui.tab]||viewBoard;
+  document.getElementById("app").innerHTML=header()+`<main class="wrap">${v()}</main>`+tabs()+overlays();
+  syncTyping();
+  const hd=document.querySelector(".top");if(hd)document.documentElement.style.setProperty("--hdr",hd.offsetHeight+"px");
+  window.scrollTo(0,y);
+  if(fid){const el=document.getElementById(fid);if(el){try{el.focus({preventScroll:true});if(ss!==null)el.setSelectionRange(ss,se)}catch(e){}}}
+  const on=document.querySelector(".evtab.on");if(on){const box=on.parentElement;const r=on.getBoundingClientRect(),br=box.getBoundingClientRect();if(r.right>br.right||r.left<br.left)box.scrollLeft+=r.left-br.left-16}
+}
+
+/* ---------- actions ---------- */
+function draftOk(t){if(ui.draft&&ui.draft.ev&&ui.draft.ev[t.dataset.ev])return true;render();return false}
+const acts={
+  noop(){},
+  tab(t){ui.tab=t.dataset.v;ui.sel=null;if(ui.tab!=="board")ui.edit=false;savePref();render();window.scrollTo(0,0)},
+  pickEv(t){ui.ev=t.dataset.id;ui.sel=null;savePref();render()},
+  editToggle(){ui.edit=!ui.edit;ui.sel=null;render()},
+  goEdit(t){if(t.dataset.id)ui.ev=t.dataset.id;ui.tab="board";ui.edit=true;ui.sel=null;savePref();render();window.scrollTo(0,0)},
+  chip(t,e){if(!ui.edit)return;e.stopPropagation();const k=t.dataset.k;
+    if(ui.sel&&ui.sel!==k){const row=t.closest(".car[data-car]");const src=[...document.querySelectorAll("#board .chip[data-k]")].find(x=>x.dataset.k===ui.sel);if(row&&src&&src.closest(".car")!==row){moveItem(ui.sel,row.dataset.car);return}}
+    ui.sel=ui.sel===k?null:k;render()},
+  drop(t){if(!ui.edit||!ui.sel)return;moveItem(ui.sel,t.dataset.car)},
+  removeCar(t,e){e.stopPropagation();const E0=curEv();if(!E0||!E0.board)return;const eid=E0.id,id=t.dataset.car;const c0=E0.board.cars.find(x=>x.id===id);if(!c0)return;
+    ask(`${carName(c0)}を外しますか？\n乗っていた人は「まだ乗る車なし」に移ります。`,"外す",()=>{const E=D.events.find(x=>x.id===eid);const c=E&&E.board&&E.board.cars.find(x=>x.id===id);if(!c)return;commit(`${evName(E)}：${carName(c)}を外した`,()=>{
+      E.board.cars=E.board.cars.filter(x=>x!==c);E.board.unassigned.push(...c.items);
+      E.board.unused.push({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:c.tools});if(E.confirmed&&!E.board.changed.includes("removed"))E.board.changed.push("removed")})})},
+  useCar(t){const E=curEv();if(!E||!E.board)return;const id=t.dataset.car;const c=E.board.unused.find(x=>x.id===id);if(!c)return;
+    commit(`${evName(E)}：${carName(c)}を追加`,()=>{E.board.unused=E.board.unused.filter(x=>x!==c);
+      removeEverywhere(E,`a:${c.familyId}:${c.who}`);
+      E.board.cars.push(Object.assign({},c,{items:[]}));if(E.confirmed)markChanged(E,[c.id])})},
+  auto(){const E0=curEv();if(!E0)return;const eid=E0.id;const run=()=>{const E=D.events.find(x=>x.id===eid);if(!E)return;commit(`${evName(E)}：自動で割り振り`,()=>{E.board=autoAssign(D,E,E.board&&E.board.away||[]);E.board.at=Date.now();E.confirmed=false});ui.tab="board";savePref();render();window.scrollTo(0,0)};
+    if(E0.board)ask("このイベントのボードを作り直します。\n手直しした内容は上書きされます（履歴から戻せます）。","作り直す",run);else run()},
+  confirm(){const E=curEv();if(!E||!E.board)return;commit(`${evName(E)}：${E.confirmed?"配車の変更を確定":"配車を確定"}`,()=>{E.confirmed=true;E.board.changed=[]});toast("確定しました。画像にしてLINEに貼ってね")},
+  alertDone(t){const id=t.dataset.id;commit("要対応を対応済みにした",()=>D.alerts=D.alerts.filter(a=>a.id!==id))},
+  reload(){location.reload()},
+  addEv(){const last=sortedEvents().slice(-1)[0];const id=uid("e");
+    commit("イベントを追加",()=>D.events.push({id,date:last&&last.date>=todayISO()?last.date:todayISO(),time:"08:00",venue:"",title:"新しいイベント",grades:[1,2,3,4,5,6],coaches:D.coaches.map(c=>c.id),carLimit:"",confirmed:false,board:null}));
+    ui.ev=id;savePref();render();toast("イベントを追加しました。名前や日付を入れてね")},
+  delEv(){const E0=curEv();if(!E0)return;const eid=E0.id;ask(`「${evName(E0)}」を削除しますか？\nこのイベントの回答とボードも消えます。`,"削除する",()=>{const E=D.events.find(x=>x.id===eid);if(!E)return;commit(`イベント「${evName(E)}」を削除`,()=>{D.events=D.events.filter(x=>x.id!==eid);prune()});ui.ev="";render()})},
+  grade(t){const E=curEv();if(!E)return;const g=+t.dataset.g;const has=(E.grades||[]).includes(g);commit(`${evName(E)}：対象学年を変更`,()=>E.grades=has?E.grades.filter(x=>x!==g):(E.grades||[]).concat(g).sort((a,b)=>a-b))},
+  gradeSet(t){const E=curEv();if(!E)return;commit(`${evName(E)}：対象学年を変更`,()=>E.grades=t.dataset.g.split(",").map(Number))},
+  coachPick(t){const E=curEv();if(!E)return;const id=t.dataset.id;const c=D.coaches.find(x=>x.id===id);if(!c)return;const on=(E.coaches||[]).includes(id);
+    commit(`${evName(E)}：${c.name}を${on?"欠席に":"参加に"}`,()=>{E.coaches=on?E.coaches.filter(x=>x!==id):(E.coaches||[]).concat(id);if(E.board){const from=removeEverywhere(E,"c:"+id);if(E.confirmed)markChanged(E,from)}})},
+  async saveImg(){
+    if(typeof html2canvas!=="function"){toast("画像の準備ができませんでした。通信を確認して再読み込みしてね");return}
+    if(ui.busy)return;ui.busy=true;
+    ui.edit=false;ui.sel=null;render();toast("画像を作っています…");
+    try{if(document.fonts&&document.fonts.ready)await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,1500))]);
+      const cv=await html2canvas(document.getElementById("board"),{scale:2,backgroundColor:"#fbfcfc",useCORS:true,logging:false,onclone:doc=>{const b=doc.getElementById("board");if(b)b.classList.add("cap")}});
+      ui.img=cv.toDataURL("image/png");toast("");render();
+    }catch(err){toast("画像にできませんでした。もう一度試してね")}
+    finally{ui.busy=false}
+  },
+  closeImg(){ui.img=null;render()},
+  modalCancel(){ui.modal=null;render()},
+  modalOk(){const ok=ui.modal.ok;ui.modal=null;fresh();ok();render()},
+  copyRemind(){const txt=remindText(D.families.filter(f=>!D.answers[f.id]));
+    // 1) old-style copy inside the tap (works in most in-app browsers), 2) clipboard API, 3) ask to long-press the text
+    let ok=false;try{const ta=document.createElement("textarea");ta.value=txt;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;opacity:0;font-size:16px";document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,txt.length);ok=document.execCommand("copy");ta.remove()}catch(e){}
+    if(ok){toast("コピーしました。LINEに貼ってね");return}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast("コピーしました。LINEに貼ってね"),()=>toast("下の文章を長押ししてコピーしてね"))}else toast("下の文章を長押ししてコピーしてね")},
+  setDraft(t){if(!draftOk(t))return;ui.draft.ev[t.dataset.ev][t.dataset.k]=t.dataset.v==="1";render()},
+  seat(t){if(!draftOk(t))return;const a=ui.draft.ev[t.dataset.ev],k=t.dataset.k;a[k]=Math.min(10,Math.max(2,a[k]+(+t.dataset.d)));render()},
+  kid(t){if(!draftOk(t))return;const a=ui.draft.ev[t.dataset.ev],id=t.dataset.id;a.absent=a.absent.includes(id)?a.absent.filter(x=>x!==id):a.absent.concat(id);render()},
+  sib(t){if(!draftOk(t))return;const a=ui.draft.ev[t.dataset.ev],id=t.dataset.id;a.siblings=a.siblings.includes(id)?a.siblings.filter(x=>x!==id):a.siblings.concat(id);render()},
+  copyPrev(t){if(!draftOk(t))return;const evs=sortedEvents();const i=+t.dataset.i;const prev=ui.draft.ev[evs[i-1].id],a=ui.draft.ev[t.dataset.ev];
+    ["fCar","fSeats","mCar","mSeats","tools","fRide","mRide"].forEach(k=>a[k]=prev[k]);a.siblings=prev.siblings.slice();render();toast("上のイベントと同じにしました（子どもの参加はそのまま）")},
+  saveAnswer(){if(!ui.draft){render();return}const fid=ui.draft._fid;const f=fam(fid);if(!f){ui.draft=null;toast("この家庭は名簿から消されています");render();return}const had=D.answers[fid];
+    const dr=ui.draft,base=dr._base||{comment:null,ev:{}};
+    // parts this phone did not touch keep whatever is saved now; touched parts are this phone's answer
+    const evNow={};D.events.forEach(e=>{const d=dr.ev[e.id];if(!d)return;evNow[e.id]=(JSON.stringify(d)===base.ev[e.id]&&had&&had.ev[e.id])?had.ev[e.id]:d});
+    const next={comment:(dr.comment===base.comment&&had)?had.comment||"":dr.comment,at:Date.now(),ev:JSON.parse(JSON.stringify(evNow))};
+    Object.values(next.ev).forEach(x=>{x.absent=(x.absent||[]).filter(id=>mem(id));x.siblings=(x.siblings||[]).filter(id=>mem(id))});
+    ui.draft=null;
+    commit(`${f.name}家が${had?"回答を変更":"回答"}`,()=>{
+      D.events.forEach(e=>{if(!e.confirmed||!e.board)return;const before=JSON.stringify(had&&had.ev[e.id]?had.ev[e.id]:defaultEv());if(before!==JSON.stringify(next.ev[e.id]))D.alerts.push({id:uid("a"),eid:e.id,fid,text:`${evName(e)}：${f.name}家が確定後に回答を変更しました`,at:Date.now()})});
+      D.answers[fid]=next});
+    toast(had?"回答を更新しました":"回答しました。ありがとう！")},
+  addFam(){commit("家庭を追加",()=>D.families.push({id:uid("f"),name:"新しい家庭",order:Date.now()}))},
+  delFam(t){const id=t.dataset.id;const f0=fam(id);if(!f0)return;ask(`${f0.name}家と、その子どもを名簿から消しますか？`,"消す",()=>{const f=fam(id);if(!f)return;commit(`${f.name}家を削除`,()=>{D.families=D.families.filter(x=>x.id!==id);D.members=D.members.filter(m=>m.familyId!==id);delete D.answers[id];if(P.me===id){P.me="";savePref()}prune()})})},
+  addMem(t){const f=fam(t.dataset.id);if(!f)return;commit(`${f.name}家に子どもを追加`,()=>D.members.push({id:uid("m"),familyId:f.id,name:"名前",grade:1,kind:"player",order:Date.now()}))},
+  delMem(t){const id=t.dataset.id;const m0=mem(id);if(!m0)return;ask(`${m0.name}を名簿から消しますか？`,"消す",()=>{const m=mem(id);if(!m)return;commit(`${m.name}を削除`,()=>{D.members=D.members.filter(x=>x.id!==id);prune()})})},
+  addCoach(){commit("指導者を追加",()=>{const id=uid("c");D.coaches.push({id,name:"新しいC",order:Date.now()});D.events.forEach(e=>(e.coaches=e.coaches||[]).push(id))})},
+  delCoach(t){const id=t.dataset.id;const c0=D.coaches.find(x=>x.id===id);if(!c0)return;ask(`${c0.name}を消しますか？`,"消す",()=>{const c=D.coaches.find(x=>x.id===id);if(!c)return;commit(`${c.name}を削除`,()=>{D.coaches=D.coaches.filter(x=>x.id!==id);prune()})})},
+  gradeUp(){ask("1〜6年の子を全員1学年上げますか？","上げる",()=>commit("全員の学年を1つ上げた",()=>D.members.forEach(m=>{if(m.grade>=1&&m.grade<=6)m.grade++})))},
+  bulk(){const lines=ui.bulk.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(!lines.length){toast("登録する行を入力してね");return}
+    let n=0;const base=Date.now();ui.bulk="";commit(`まとめて登録（${lines.length}行）`,()=>{lines.forEach(line=>{const c=line.split(/[,\t、，]/).map(s=>s.trim());if(c.length<2||!c[0]||!c[1])return;
+      const fname=c[0].replace(/家$/,"").slice(0,10);let f=D.families.find(x=>x.name===fname);if(!f){f={id:uid("f"),name:fname,order:base+n};D.families.push(f)}
+      const gs=(c[2]||"").replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-0xFEE0));const grade=/未/.test(gs)?0:/中|高/.test(gs)?7:Math.min(6,Math.max(1,parseInt(gs.replace(/[^\d]/g,""),10)||1));
+      D.members.push({id:uid("m"),familyId:f.id,name:c[1].slice(0,10),grade,kind:/兄弟/.test(c[3]||"")?"sibling":"player",order:base+n});n++})});
+    toast(`${n}人を登録しました`)},
+  restore(t){const id=t.dataset.id;const h0=(H||[]).find(h=>h.id===id);if(!h0)return;
+    ask(`「${h0.text}」の前の状態に戻しますか？\nそれより後の変更も戻ります。`,"戻す",()=>{
+      const idx=(H||[]).findIndex(h=>h.id===id);if(idx<0)return;const h=H[idx];
+      // undo every change from the newest one back to the chosen one
+      const cur=docsOf(D),target=new Map(cur);
+      for(let j=0;j<=idx;j++)(H[j].changes||[]).forEach(c=>{const k=c.col+"/"+c.id;if(c.before==null)target.delete(k);else target.set(k,JSON.stringify(c.before))});
+      const{ops,changes}=diffOps(cur,target);
+      if(!ops.length){toast("戻すものはありませんでした");return}
+      send(ops,`「${h.text}」の前に戻した`,changes);build();ui.stale=false;ui.draft=null;render();toast("戻しました")})}
+};
+function onBoard(E,k){const B=E.board;return !!B&&(B.unassigned.includes(k)||(B.away||[]).includes(k)||B.cars.some(c=>c.items.includes(k)))}
+function removeEverywhere(E,k){const B=E.board;if(!B)return[];const from=[];B.cars.forEach(c=>{if(c.items.includes(k)){c.items=c.items.filter(x=>x!==k);from.push(c.id)}});B.unassigned=B.unassigned.filter(x=>x!==k);B.away=(B.away||[]).filter(x=>x!==k);return from}
+function markChanged(E,ids){ids.forEach(id=>{if(id!=="un"&&id!=="away"&&!E.board.changed.includes(id))E.board.changed.push(id)})}
+function moveItem(k,to){fresh();const E=curEv();if(!E||!E.board)return;if((to!=="un"&&to!=="away"&&!E.board.cars.some(c=>c.id===to))||!info(k)||!onBoard(E,k)){ui.sel=null;render();return}const i=info(k);const dest=to==="un"?"乗る車なし":to==="away"?"欠席":carName(E.board.cars.find(c=>c.id===to));
+  commit(`${evName(E)}：${i.label}を${dest}へ移動`,()=>{const from=removeEverywhere(E,k);if(to==="un")E.board.unassigned.push(k);else if(to==="away")(E.board.away=E.board.away||[]).push(k);else E.board.cars.find(c=>c.id===to).items.push(k);
+    if(E.confirmed)markChanged(E,from.concat(to))});ui.sel=null;render()}
+
+/* ---------- drag & drop on the board ---------- */
+let drag=null,suppressClick=false;
+function carAt(x,y){const el=document.elementFromPoint(x,y);return el&&el.closest("#board .car[data-car]")}
+function updateOver(){const car=carAt(drag.x,drag.y);if(car!==drag.over){if(drag.over)drag.over.classList.remove("over");if(car)car.classList.add("over");drag.over=car}}
+function endDrag(){if(!drag)return;if(drag.ghost)drag.ghost.remove();if(drag.el)drag.el.classList.remove("dragging");if(drag.over)drag.over.classList.remove("over");cancelAnimationFrame(drag.raf);drag=null}
+document.addEventListener("pointerdown",e=>{if(!ui.edit||e.button>0)return;const c=e.target.closest("#board .chip[data-k]");if(!c)return;drag={k:c.dataset.k,el:c,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,started:false,over:null,ghost:null,raf:0}});
+document.addEventListener("pointermove",e=>{if(!drag)return;drag.x=e.clientX;drag.y=e.clientY;
+  if(!drag.started){if(Math.hypot(drag.x-drag.x0,drag.y-drag.y0)<6)return;drag.started=true;
+    if(ui.sel){ui.sel=null;document.querySelectorAll("#board .chip.sel").forEach(x=>x.classList.remove("sel"))}
+    const g=drag.el.cloneNode(true);g.classList.remove("sel");g.classList.add("ghost");g.removeAttribute("data-act");document.body.appendChild(g);drag.ghost=g;drag.el.classList.add("dragging");
+    const loop=()=>{if(!drag)return;const h=window.innerHeight;if(drag.y<110)window.scrollBy(0,-10);else if(drag.y>h-130)window.scrollBy(0,10);updateOver();drag.raf=requestAnimationFrame(loop)};drag.raf=requestAnimationFrame(loop)}
+  e.preventDefault();drag.ghost.style.left=drag.x+"px";drag.ghost.style.top=drag.y+"px";updateOver()},{passive:false});
+document.addEventListener("pointerup",e=>{if(!drag)return;const d=drag;if(!d.started){drag=null;return}
+  const car=carAt(e.clientX,e.clientY);const k=d.k;endDrag();suppressClick=true;setTimeout(()=>{suppressClick=false},350);
+  const E=curEv();
+  if(car&&E&&E.board){const to=car.dataset.car;if(d.el.closest(".car")!==car){moveItem(k,to);return}}
+  render()});
+document.addEventListener("pointercancel",()=>{endDrag();render()});
+document.addEventListener("click",e=>{if(suppressClick){suppressClick=false;e.stopPropagation();return}const t=e.target.closest("[data-act]");if(!t)return;
+  const a=document.activeElement;if(isControl(a)&&!t.contains(a)){if(a.tagName==="INPUT"&&a.dataset.ch)onChange(a);if(!isTextField(a))a.blur()}const fn=acts[t.dataset.act];if(fn){if(t.dataset.act==="noop"){e.stopPropagation();return}if(t.dataset.act!=="chip"&&t.dataset.act!=="drop")fresh();fn(t,e)}});
+document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.ch)onChange(t)});
+function onChange(t){const k=t.dataset.ch;if(k!=="me"&&k!=="ansFam")fresh();
+  if(k==="me"){P.me=t.value;if(!ui.ansFam)ui.ansFam=P.me;savePref();t.blur();render();return}
+  if(k==="ansFam"){ui.ansFam=t.value;ui.draft=null;if(!P.me){P.me=t.value;savePref()}t.blur();render();return}
+  if(k==="deadline"){if(D.deadline===t.value)return;commit("回答締切を変更",()=>D.deadline=t.value,true);return}
+  if(k==="ev"){const E=D.events.find(x=>x.id===t.dataset.eid);if(!E)return;const key=t.dataset.k;let val=t.value;
+    if(key==="carLimit"){const n=parseInt(val.replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-0xFEE0)),10);val=n>0?n:"";t.value=val}
+    if(key==="date"&&(!val||val<cutoffISO())){t.value=E.date;toast("日付は"+KEEP_DAYS+"日前より後にしてね");return}
+    if(key==="title"||key==="venue"){val=val.trim();if(key==="title"&&!val){t.value=E.title;return}t.value=val}
+    if(String(E[key]??"")===String(val))return;
+    const labels={date:"日付",time:"集合時間",venue:"会場",title:"イベント名",carLimit:"配車制限台数"};commit(`${evName(E)}：${labels[key]}を変更`,()=>E[key]=val,true);return}
+  if(k==="famName"){const f=fam(t.dataset.id);if(!f)return;const v=t.value.trim().replace(/家$/,"");if(!v||v===f.name){t.value=f.name;return}commit(`${f.name}家の名前を${v}家に変更`,()=>f.name=v,true);return}
+  if(k==="mem"){const m=mem(t.dataset.id);if(!m)return;const key=t.dataset.k;let v=t.value;if(key==="grade")v=+v;if(key==="name"){v=v.trim();if(!v){t.value=m.name;return}}
+    if(m[key]===v)return;
+    const what={name:"名前",grade:"学年",kind:"区分"}[key];commit(`${m.name}の${what}を変更`,()=>m[key]=v,true);
+    if(t.tagName==="SELECT")t.blur();return}
+  if(k==="coach"){const c=D.coaches.find(x=>x.id===t.dataset.id);if(!c)return;const v=t.value.trim();if(!v||v===c.name){t.value=c.name;return}commit(`指導者「${c.name}」を「${v}」に変更`,()=>c.name=v,true);return}
+}
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset.in==="comment"&&ui.draft)ui.draft.comment=t.value;if(t.dataset.in==="bulk")ui.bulk=t.value});
+boot();
+})();
+</script>
+</body>
+</html>

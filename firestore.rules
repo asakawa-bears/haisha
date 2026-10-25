@@ -1,0 +1,98 @@
+rules_version = '2';
+
+// 浅川ベアーズ 配車ボード — Firestore security rules
+// Anyone with the app link can read and edit (the team chose no passcode and no login).
+// These rules make sure that every write comes from the app (anonymous sign-in) and has the
+// expected shape and size, and that the last day of undo history cannot be erased.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function str(v, n) { return v is string && v.size() <= n; }
+    function okId(id) { return id.size() <= 40; }
+    function exact(d, ks) { return d.keys().hasOnly(ks) && d.keys().hasAll(ks); }
+
+    match /families/{id} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && okId(id) && validFamily(request.resource.data);
+      function validFamily(d) {
+        return exact(d, ['name', 'order']) && str(d.name, 40) && d.order is number;
+      }
+    }
+
+    match /members/{id} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && okId(id) && validMember(request.resource.data);
+      function validMember(d) {
+        return exact(d, ['familyId', 'name', 'grade', 'kind', 'order'])
+          && str(d.familyId, 40) && str(d.name, 40)
+          && d.grade is number && d.grade >= 0 && d.grade <= 7
+          && d.kind in ['player', 'sibling'] && d.order is number;
+      }
+    }
+
+    match /coaches/{id} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && okId(id) && validCoach(request.resource.data);
+      function validCoach(d) {
+        return exact(d, ['name', 'order']) && str(d.name, 40) && d.order is number;
+      }
+    }
+
+    match /events/{id} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && okId(id) && validEvent(request.resource.data);
+      function validEvent(d) {
+        return exact(d, ['date', 'time', 'venue', 'title', 'grades', 'coaches', 'carLimit', 'confirmed', 'board'])
+          && str(d.date, 10) && str(d.time, 5) && str(d.venue, 60) && str(d.title, 60)
+          && d.grades is list && d.grades.size() <= 8
+          && d.coaches is list && d.coaches.size() <= 60
+          && (d.carLimit == '' || d.carLimit is number)
+          && d.confirmed is bool
+          && (d.board == null || (d.board is map
+                && d.board.keys().hasOnly(['cars', 'unassigned', 'unused', 'away', 'changed', 'at'])
+                && d.board.cars is list && d.board.cars.size() <= 100
+                && d.board.unassigned is list && d.board.unassigned.size() <= 300));
+      }
+    }
+
+    // one document per family
+    match /answers/{familyId} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && okId(familyId) && validAnswer(request.resource.data);
+      function validAnswer(d) {
+        return exact(d, ['comment', 'at', 'ev']) && str(d.comment, 1000) && d.at is number && d.ev is map;
+      }
+    }
+
+    match /alerts/{id} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && okId(id) && validAlert(request.resource.data);
+      function validAlert(d) {
+        return exact(d, ['eid', 'fid', 'text', 'at']) && str(d.eid, 40) && str(d.fid, 40) && str(d.text, 300) && d.at is number;
+      }
+    }
+
+    // the answer deadline
+    match /config/{id} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && id == 'main' && exact(request.resource.data, ['deadline']) && str(request.resource.data.deadline, 10);
+      allow delete: if false;
+    }
+
+    // change history (used for 「この前に戻す」). Entries are never edited; only entries older than a day may be removed.
+    match /history/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && okId(id) && validHistory(request.resource.data);
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.at < request.time.toMillis() - 86400000;
+      function validHistory(d) {
+        return exact(d, ['at', 'who', 'text', 'changes'])
+          && d.at is number && str(d.who, 60) && str(d.text, 200)
+          && d.changes is list && d.changes.size() <= 500;
+      }
+    }
+
+    // anything else: no access
+  }
+}
