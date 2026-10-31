@@ -280,7 +280,7 @@ body.editing .wrap>.stack{gap:8px}
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-31 15:17";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-31 17:00";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
@@ -480,17 +480,20 @@ function autoAssign(S,ev,skip){
   const tc=cars.filter(c=>c.tools);
   // tools the coordinator moved to 欠席 stay there
   const toolKeys=["t:dougu","t:touban"].filter(k=>!skip.includes(k));
-  if(tc.length){const d=tc.slice().sort((a,b)=>free(b)-free(a))[0];if(toolKeys.includes("t:dougu"))d.items.push("t:dougu");if(toolKeys.includes("t:touban"))(tc.find(c=>c!==d)||d).items.push("t:touban")}
+  // 道具 needs 2 free seats: a car that is too small for it leaves it in まだ乗る車なし
+  if(tc.length){const d=tc.slice().sort((a,b)=>free(b)-free(a))[0];
+    if(toolKeys.includes("t:dougu")){if(free(d)>=TOOL_SEATS)d.items.push("t:dougu");else unassignedTools.push("t:dougu")}
+    if(toolKeys.includes("t:touban"))(tc.find(c=>c!==d)||d).items.push("t:touban")}
   else unassignedTools.push(...toolKeys);
-  // 1) coaches together in 1号 (the first family in the roster order), then 2号, 3号… when its seats run out.
-  //    A car's own family keeps its seats; only if no car has room left after its family do coaches take any free seat.
+  // 1) coaches first, all together in 1号 (the first family in the roster order); that family's children move to other cars if needed.
+  //    If 1号 cannot hold them all (seats / tools), the first car in roster order that can. Split from 1号 only when no car can.
   const coachKeys=coachIds.map(id=>"c:"+id).filter(k=>!skip.includes(k));
   const rank=c=>{const i=fams.findIndex(f=>f.id===c.familyId);return (i<0?1e6:i)*2+(c.who==="f"?0:1)};
   if(coachKeys.length&&cars.length){
-    const own=c=>Math.ceil(unitOf(fams.find(f=>f.id===c.familyId)).length/Math.max(1,cars.filter(x=>x.familyId===c.familyId).length));
     const order=cars.slice().sort((a,b)=>rank(a)-rank(b));
-    for(const c of order){while(coachKeys.length&&free(c)-own(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
-    for(const c of order){while(coachKeys.length&&free(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
+    const whole=order.find(c=>free(c)>=coachKeys.length);
+    if(whole)whole.items.push(...coachKeys.splice(0));
+    else for(const c of order){while(coachKeys.length&&free(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
   }
   const unassigned=unassignedTools.concat(coachKeys);
   // 2) own family's car: its own children first, then a parent riding along
