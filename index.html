@@ -203,6 +203,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 @media (min-width:520px){.mem{grid-template-columns:20px minmax(0,1fr) 120px 96px 34px;grid-template-areas:"dot name grade kind x"}}
 .mem input,.mem select{min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:4px 6px;width:100%;min-width:0;font-size:16px}
 .mem .dot{width:20px;height:20px;border-radius:50%}
+.x:disabled{opacity:.3;cursor:default}
 .x{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
 
 .hist{display:grid;gap:0}
@@ -279,7 +280,7 @@ body.editing .wrap>.stack{gap:8px}
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-31 13:58";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-31 15:17";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
@@ -481,11 +482,14 @@ function autoAssign(S,ev,skip){
   const toolKeys=["t:dougu","t:touban"].filter(k=>!skip.includes(k));
   if(tc.length){const d=tc.slice().sort((a,b)=>free(b)-free(a))[0];if(toolKeys.includes("t:dougu"))d.items.push("t:dougu");if(toolKeys.includes("t:touban"))(tc.find(c=>c!==d)||d).items.push("t:touban")}
   else unassignedTools.push(...toolKeys);
-  // 1) coaches together, in the car with the most room left after its own family
+  // 1) coaches together in 1号 (the first family in the roster order), then 2号, 3号… when its seats run out.
+  //    A car's own family keeps its seats; only if no car has room left after its family do coaches take any free seat.
   const coachKeys=coachIds.map(id=>"c:"+id).filter(k=>!skip.includes(k));
+  const rank=c=>{const i=fams.findIndex(f=>f.id===c.familyId);return (i<0?1e6:i)*2+(c.who==="f"?0:1)};
   if(coachKeys.length&&cars.length){
-    const own=c=>unitOf(fams.find(f=>f.id===c.familyId)).length/Math.max(1,cars.filter(x=>x.familyId===c.familyId).length);
-    const order=cars.slice().sort((a,b)=>(free(b)-own(b))-(free(a)-own(a)));
+    const own=c=>Math.ceil(unitOf(fams.find(f=>f.id===c.familyId)).length/Math.max(1,cars.filter(x=>x.familyId===c.familyId).length));
+    const order=cars.slice().sort((a,b)=>rank(a)-rank(b));
+    for(const c of order){while(coachKeys.length&&free(c)-own(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
     for(const c of order){while(coachKeys.length&&free(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
   }
   const unassigned=unassignedTools.concat(coachKeys);
@@ -511,10 +515,8 @@ function autoAssign(S,ev,skip){
       const f2=cars.filter(c=>free(c)>0).sort(better(g));
       if(f2.length)f2[0].items.push(k);else unassigned.push(k)}
   }
-  // car order: the coaches' car is 1号, then the cars by their oldest child's grade
-  const coachN=c=>c.items.filter(k=>k.startsWith("c:")).length;
-  const topGrade=c=>{const g=c.items.filter(k=>k.startsWith("k:")).map(gradeOf);return g.length?Math.max(...g):-1};
-  cars.sort((a,b)=>(coachN(b)>0)-(coachN(a)>0)||coachN(b)-coachN(a)||topGrade(b)-topGrade(a));
+  // car order = the roster's family order (father's car before mother's)
+  cars.sort((a,b)=>rank(a)-rank(b));
   // a parent who now drives cannot also be listed as absent / riding
   const away=skip.filter(k=>!(k.startsWith("a:")&&drives(k.split(":")[1],k.split(":")[2])));
   return {cars,unassigned,unused:cands.filter(c=>!sel.includes(c)),away,changed:[],at:Date.now()};
@@ -551,6 +553,9 @@ function absentRow(E){
   const drop=ui.edit&&ui.sel&&!keys.includes(ui.sel);
   return `<div class="car absent${drop?" drop":""}" data-act="drop" data-car="away"><div class="car-head"><span class="car-absent-label">欠席<br>${keys.length}人</span></div><div class="car-items">${keys.length?keys.map(chip).join(""):`<span class="absent-none">なし</span>`}</div></div>`}
 const carName=c=>{const f=fam(c.familyId);return `${f?f.name:"?"}${c.who==="f"?"父号":"母号"}`};
+// cars are numbered 1号, 2号… in the roster's family order (father's car before mother's)
+const famRank=id=>{const i=D.families.findIndex(f=>f.id===id);return i<0?1e9:i};
+const carsInOrder=list=>list.slice().sort((a,b)=>famRank(a.familyId)-famRank(b.familyId)||(a.who==="f"?0:1)-(b.who==="f"?0:1));
 const used=c=>1+c.items.filter(k=>!k.startsWith("t:")).length+(c.items.includes("t:dougu")?TOOL_SEATS:0);
 function prune(){
   const ok=k=>!!info(k);
@@ -589,7 +594,7 @@ function evTabs(withAdd){
 function boardHTML(E){
   const B=E.board;
   const order=k=>(info(k)||{sort:50}).sort;
-  const rows=B.cars.map((c,ci)=>{
+  const rows=carsInOrder(B.cars).map((c,ci)=>{
     const f=fam(c.familyId);const u=used(c);
     const people=c.items.filter(k=>!k.startsWith("t:")).sort((a,b)=>order(a)-order(b));
     const tools=c.items.filter(k=>k.startsWith("t:"));
@@ -630,7 +635,7 @@ function viewBoard(){
   return `<div class="stack">${head}
     ${editbar}${boardHTML(E)}
     ${ui.edit?"":`<div class="btns"><button class="btn primary" data-act="saveImg">画像にしてLINEに貼る</button><button class="btn" data-act="editToggle">手直しする</button></div>`}
-    ${ui.edit&&E.board.unused.length?`<div class="card"><p class="sec">使っていない車</p>${E.board.unused.map(c=>`<div class="row" style="flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc(carName(c))}（${c.cap}人乗り${c.tools?"・道具OK":""}）</span><button class="btn small" style="flex:none" data-act="useCar" data-car="${c.id}">この車も使う</button></div>`).join("")}</div>`:""}
+    ${ui.edit&&E.board.unused.length?`<div class="card"><p class="sec">使っていない車</p>${carsInOrder(E.board.unused).map(c=>`<div class="row" style="flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc(carName(c))}（${c.cap}人乗り${c.tools?"・道具OK":""}）</span><button class="btn small" style="flex:none" data-act="useCar" data-car="${c.id}">この車も使う</button></div>`).join("")}</div>`:""}
   </div>`;
 }
 function seg(eid,k,v){return `<div class="seg" role="group"><button class="${v?"on":""}" data-act="setDraft" data-ev="${eid}" data-k="${k}" data-v="1" aria-pressed="${v}">○</button><button class="${!v?"on":""}" data-act="setDraft" data-ev="${eid}" data-k="${k}" data-v="0" aria-pressed="${!v}">×</button></div>`}
@@ -704,7 +709,7 @@ function viewAdmin(){
     </div>
     <div class="card"><p class="sec">${esc(evName(E))}の配車</p>
       <p class="muted" style="margin:0">このイベントに回答済み：<b>${D.families.filter(f=>evAnswer(f.id,E.id)).length}/${D.families.length}家庭</b>（イベントを後から追加したときは、回答し直してもらってね）</p>
-      <p class="muted" style="margin:0">指導者は1号車 → 自分の家庭の車 → 学年ごと、の順で自動で組みます。車を出さずに同行する母は、できるだけ母号に乗せます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
+      <p class="muted" style="margin:0">車は名簿の家庭の順に1号車から並びます。指導者は1号車 → 自分の家庭の車 → 学年ごと、の順で自動で組みます。車を出さずに同行する母は、できるだけ母号に乗せます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
       ${E.board&&E.carLimit&&E.board.cars.length>E.carLimit?`<p class="pill" style="justify-self:start">配車制限を${E.board.cars.length-E.carLimit}台オーバーしています</p>`:""}
       <button class="btn primary wide" data-act="auto">${E.board?"回答から自動で割り振り直す":"回答から自動で割り振る"}</button>
       ${E.board?`<div class="btns"><button class="btn" data-act="goEdit" data-id="${E.id}" style="flex:1">ボードを手直し</button><button class="btn" data-act="confirm" style="flex:1" ${E.confirmed&&!E.board.changed.length?"disabled":""}>${E.confirmed?(E.board.changed.length?"変更を確定":"確定済み"):"配車を確定"}</button></div>
@@ -727,14 +732,14 @@ function viewAdmin(){
 function remindText(not){const evs=sortedEvents();return `【配車アンケート】${evs.map(e=>`${dShort(e.date)} ${e.title}`).join("／")}\nまだ回答していない家庭：${not.map(f=>f.name+"家").join("、")}\n${D.deadline?`締切は${dLabel(D.deadline)}です。`:""}アプリから回答お願いします！`}
 function gradeSelect(m){return `<select data-ch="mem" data-id="${m.id}" data-k="grade" aria-label="${esc(m.name)}の学年">${GRADES.map(g=>`<option value="${g.v}" ${m.grade===g.v?"selected":""}>${g.l}</option>`).join("")}</select>`}
 function viewRoster(){
-  const famHTML=D.families.map(f=>{
+  const famHTML=D.families.map((f,fi)=>{
     const ms=D.members.filter(m=>m.familyId===f.id);
-    return `<div class="fam"><div class="fam-head"><input type="text" id="fn-${f.id}" value="${esc(f.name)}" data-ch="famName" data-id="${f.id}" maxlength="10" aria-label="家庭名"><span class="muted">家</span><button class="x" data-act="delFam" data-id="${f.id}" aria-label="${esc(f.name)}家を削除">×</button></div>
+    return `<div class="fam"><div class="fam-head"><input type="text" id="fn-${f.id}" value="${esc(f.name)}" data-ch="famName" data-id="${f.id}" maxlength="10" aria-label="家庭名"><span class="muted">家</span><button class="x mv" data-act="famMove" data-id="${f.id}" data-d="-1" aria-label="${esc(f.name)}家を上へ" ${fi===0?"disabled":""}>▲</button><button class="x mv" data-act="famMove" data-id="${f.id}" data-d="1" aria-label="${esc(f.name)}家を下へ" ${fi===D.families.length-1?"disabled":""}>▼</button><button class="x" data-act="delFam" data-id="${f.id}" aria-label="${esc(f.name)}家を削除">×</button></div>
       ${ms.map(m=>`<div class="mem"><span class="dot" style="background:${GCOL[m.grade]};${m.grade<=1?"box-shadow:inset 0 0 0 1px #93c39e":""}"></span><input type="text" id="mn-${m.id}" value="${esc(m.name)}" data-ch="mem" data-id="${m.id}" data-k="name" maxlength="10" aria-label="名前">${gradeSelect(m)}<select data-ch="mem" data-id="${m.id}" data-k="kind" aria-label="区分"><option value="player" ${m.kind==="player"?"selected":""}>選手</option><option value="sibling" ${m.kind==="sibling"?"selected":""}>兄弟児</option></select><button class="x" data-act="delMem" data-id="${m.id}" aria-label="${esc(m.name)}を削除">×</button></div>`).join("")}
       <button class="btn small" data-act="addMem" data-id="${f.id}" style="justify-self:start">＋ 子どもを追加</button></div>`}).join("");
   const hist=(H||[]).slice(0,20).map(h=>`<div><span><time>${stamp(h.at)}・${esc(h.who)}</time>${esc(h.text)}</span><button class="btn small" data-act="restore" data-id="${esc(h.id)}">この前に戻す</button></div>`).join("");
   return `<div class="stack">
-    <div class="card"><p class="sec">家庭と子ども</p><p class="muted" style="margin:0">誰でも修正できます。変更は下の履歴に残り、元に戻せます。</p>${famHTML}
+    <div class="card"><p class="sec">家庭と子ども</p><p class="muted" style="margin:0">誰でも修正できます。変更は下の履歴に残り、元に戻せます。▲▼で家庭の順番を変えると、ボードの1号車からの並びもこの順になります。</p>${famHTML}
       <button class="btn" data-act="addFam">＋ 家庭を追加</button></div>
     <div class="card"><p class="sec">指導者</p>${D.coaches.map(c=>`<div class="fam-head"><span class="chip staff" style="width:34px;height:34px;font-size:10px"> </span><input type="text" id="cn-${c.id}" value="${esc(c.name)}" data-ch="coach" data-id="${c.id}" maxlength="10" aria-label="指導者名" style="min-height:40px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--surface)"><button class="x" data-act="delCoach" data-id="${c.id}" aria-label="${esc(c.name)}を削除">×</button></div>`).join("")}
       <button class="btn small" data-act="addCoach" style="justify-self:start">＋ 指導者を追加</button></div>
@@ -866,6 +871,8 @@ const acts={
       D.answers[fid]=next});
     toast(had?"回答を更新しました":"回答しました。ありがとう！")},
   addFam(){commit("家庭を追加",()=>D.families.push({id:uid("f"),name:"新しい家庭",order:Date.now()}))},
+  famMove(t){const id=t.dataset.id,d=+t.dataset.d;const i=D.families.findIndex(f=>f.id===id),j=i+d;if(i<0||j<0||j>=D.families.length)return;
+    commit(`${D.families[i].name}家の順番を変更`,()=>{const L=D.families.slice();[L[i],L[j]]=[L[j],L[i]];L.forEach((f,k)=>f.order=(k+1)*10);D.families=L})},
   delFam(t){const id=t.dataset.id;const f0=fam(id);if(!f0)return;ask(`${f0.name}家と、その子どもを名簿から消しますか？`,"消す",()=>{const f=fam(id);if(!f)return;commit(`${f.name}家を削除`,()=>{D.families=D.families.filter(x=>x.id!==id);D.members=D.members.filter(m=>m.familyId!==id);delete D.answers[id];if(P.me===id){P.me="";savePref()}prune()})})},
   addMem(t){const f=fam(t.dataset.id);if(!f)return;commit(`${f.name}家に子どもを追加`,()=>D.members.push({id:uid("m"),familyId:f.id,name:"名前",grade:1,kind:"player",order:Date.now()}))},
   delMem(t){const id=t.dataset.id;const m0=mem(id);if(!m0)return;ask(`${m0.name}を名簿から消しますか？`,"消す",()=>{const m=mem(id);if(!m)return;commit(`${m.name}を削除`,()=>{D.members=D.members.filter(x=>x.id!==id);prune()})})},
