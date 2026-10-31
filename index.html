@@ -138,7 +138,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .car-lost-label{font-size:10.5px;font-weight:700;color:#c8102e;text-align:center;line-height:1.35}
 .car-items{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;align-content:start;justify-items:start;min-width:0;min-height:40px}
 .car.changed{background:var(--wb-changed)}
-.car .tag{position:absolute;right:2px;top:4px;font-size:10px;font-weight:700;background:#a15c07;color:#fff;border-radius:4px;padding:0 6px}
+.car .tag{position:absolute;left:58px;top:-9px;z-index:1;font-size:9.5px;font-weight:700;line-height:15px;background:#a15c07;color:#fff;border-radius:999px;padding:0 6px;border:1.5px solid var(--wb);white-space:nowrap}
 .car.drop{cursor:pointer}
 .car.drop .car-items{outline:2px dashed #c8102e;outline-offset:2px;border-radius:6px}
 .car.lost .car-head{border-right-style:dashed}
@@ -289,7 +289,7 @@ body.editing .wrap>.stack{gap:8px}
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-31 17:41";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-31 17:57";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
