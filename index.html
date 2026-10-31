@@ -242,6 +242,33 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 /* every list box drawn the same on every phone (no grey system style) */
 body select.input,body .mem select{-webkit-appearance:none;appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2393a0b8' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 10px center/11px 8px;padding-right:28px;color:var(--ink)}
 select.input option,.mem select option{color:var(--ink);background:var(--surface)}
+
+/* edit mode: the whiteboard fills the screen */
+body.editing .top,body.editing .tabs{display:none!important}
+body.editing .wrap{padding-top:6px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+body.editing .wrap>.stack{gap:8px}
+.editbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;background:var(--team);color:var(--team-ink);border-radius:10px;padding:6px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.editbar .btn{min-height:34px;padding:0 9px;font-size:12px;background:rgba(0,0,0,.22);border-color:rgba(255,255,255,.5);color:#fff;white-space:nowrap}
+.editbar .btn:disabled{opacity:.4}
+.editbar .eb-done{margin-left:auto;background:#fff;color:var(--team);border-color:#fff}
+.editbar .eb-hint{flex-basis:100%;padding:0 4px 2px;font-size:12px}
+.board.editing{padding:6px 6px 4px;border-width:4px}
+.board.editing .board-head{padding:0 2px 6px;gap:6px;align-items:center}
+.board.editing .bh-main{flex-wrap:nowrap;gap:8px;min-width:0;overflow:hidden}
+.board.editing .bh-line{flex-wrap:nowrap;gap:6px;min-width:0}
+.board.editing .bh-line:first-child{flex:none}
+.board.editing .bh-line:last-child{flex:1 1 auto;overflow:hidden}
+.board.editing .bh-date,.board.editing .bh-title{font-size:15px;white-space:nowrap}
+.board.editing .bh-title{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.board.editing .bh-time{font-size:13px;padding:2px 5px 3px;border-width:1.5px}
+.board.editing .bh-time small{font-size:10px}
+.board.editing .bh-venue,.board.editing .bh-grade{display:none}
+.board.editing .bh-side{grid-auto-flow:column;align-items:center;gap:4px}
+.board.editing .bh-state{margin-top:0}
+.board.editing .bh-limit{grid-auto-flow:column;align-items:baseline;gap:3px;padding:1px 5px}
+.board.editing .bh-limit b{font-size:13px}
+.board.editing .bh-limit:not(.over){display:none}
+.board.editing .car{padding:4px 0}
 </style>
 
 </head>
@@ -252,7 +279,7 @@ select.input option,.mem select option{color:var(--ink);background:var(--surface
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-31 09:18";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-31 13:58";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
@@ -312,7 +339,7 @@ async function firebaseStore(){
 /* ---------- state ---------- */
 let D={families:[],members:[],coaches:[],events:[],answers:{},alerts:[],deadline:""},P={me:"",tab:"board",ev:""};
 try{const raw=localStorage.getItem(PREF);if(raw)P=Object.assign(P,JSON.parse(raw))}catch(e){}
-const ui={tab:P.tab||"board",ev:P.ev||"",edit:false,sel:null,ansFam:P.me||"",draft:null,modal:null,img:null,bulk:"",ready:false,loadErr:null,stale:false,dirty:false};
+const ui={tab:P.tab||"board",ev:P.ev||"",edit:false,sel:null,undo:[],redo:[],ansFam:P.me||"",draft:null,modal:null,img:null,bulk:"",ready:false,loadErr:null,stale:false,dirty:false};
 let store=null,H=null,histUnsub=null,histTrimmed=false;
 const raw={};COLS.forEach(c=>raw[c]={});
 const got=new Set();
@@ -462,22 +489,32 @@ function autoAssign(S,ev,skip){
     for(const c of order){while(coachKeys.length&&free(c)>0)c.items.push(coachKeys.shift());if(!coachKeys.length)break}
   }
   const unassigned=unassignedTools.concat(coachKeys);
-  // 2) own family's car
-  const rest=[];
-  fams.forEach(f=>{const items=unitOf(f);
+  // 2) own family's car: its own children first, then a parent riding along
+  const rest=[],moms=[];
+  fams.forEach(f=>{const u=unitOf(f);const adults=u.filter(k=>k.startsWith("a:"));const items=u.filter(k=>!k.startsWith("a:")).concat(adults);
     cars.filter(c=>c.familyId===f.id).sort((a,b)=>free(b)-free(a)).forEach(c=>{while(items.length&&free(c)>0)c.items.push(items.shift())});
-    if(items.length){const kg=items.filter(k=>k.startsWith("k:")).map(gradeOf);rest.push({items,grade:kg.length?Math.max(...kg):0})}
+    // a mother riding along who did not fit in her own family's car rides in a mother's car (her children are placed on their own)
+    const mi=items.indexOf(`a:${f.id}:m`);if(mi>=0)moms.push(items.splice(mi,1)[0]);
+    if(items.length){const kg=items.filter(k=>k.startsWith("k:")).map(gradeOf);rest.push({items,grade:kg.length?Math.max(...kg):-1})}
   });
-  // 3) same grade together
-  const same=(c,g)=>c.items.filter(k=>k.startsWith("k:")&&gradeOf(k)===g).length;
+  // 3) mothers riding along: the mother-driven car with the most room
+  for(const k of moms){const mc=cars.filter(c=>c.who==="m"&&free(c)>0).sort((a,b)=>free(b)-free(a));if(mc.length)mc[0].items.push(k);else rest.push({items:[k],grade:-1})}
+  // 4) the rest by grade: a car that already has that grade, else a car with no children yet, else the closest grade
+  const kidGrades=c=>[...new Set(c.items.filter(k=>k.startsWith("k:")).map(gradeOf))];
+  const score=(c,g)=>{const G=kidGrades(c);if(g<0)return[free(c)];return[G.includes(g)?1:0,G.length?0:1,G.length?-Math.min(...G.map(x=>Math.abs(x-g))):0,-G.length,free(c)]};
+  const better=g=>(a,b)=>{const A=score(a,g),B=score(b,g);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]-A[i];return 0};
   rest.sort((a,b)=>b.grade-a.grade||b.items.length-a.items.length);
   for(const u of rest){
     const fit=cars.filter(c=>free(c)>=u.items.length);
-    if(fit.length){fit.sort((a,b)=>same(b,u.grade)-same(a,u.grade)||free(b)-free(a));fit[0].items.push(...u.items)}
+    if(fit.length){fit.sort(better(u.grade));fit[0].items.push(...u.items)}
     else for(const k of u.items){const g=k.startsWith("k:")?gradeOf(k):u.grade;
-      const f2=cars.filter(c=>free(c)>0).sort((a,b)=>same(b,g)-same(a,g)||free(b)-free(a));
+      const f2=cars.filter(c=>free(c)>0).sort(better(g));
       if(f2.length)f2[0].items.push(k);else unassigned.push(k)}
   }
+  // car order: the coaches' car is 1号, then the cars by their oldest child's grade
+  const coachN=c=>c.items.filter(k=>k.startsWith("c:")).length;
+  const topGrade=c=>{const g=c.items.filter(k=>k.startsWith("k:")).map(gradeOf);return g.length?Math.max(...g):-1};
+  cars.sort((a,b)=>(coachN(b)>0)-(coachN(a)>0)||coachN(b)-coachN(a)||topGrade(b)-topGrade(a));
   // a parent who now drives cannot also be listed as absent / riding
   const away=skip.filter(k=>!(k.startsWith("a:")&&drives(k.split(":")[1],k.split(":")[2])));
   return {cars,unassigned,unused:cands.filter(c=>!sel.includes(c)),away,changed:[],at:Date.now()};
@@ -575,11 +612,11 @@ function boardHTML(E){
   return `<div class="board${ui.edit?" editing":""}" id="board">
     <div class="board-head">
       <div class="bh-main">
-        <span class="bh-line"><span class="bh-date">${esc(dLabel(E.date))}</span><span class="bh-time"><small>集合</small>${esc(tLabel(E.time))}</span></span>
+        <span class="bh-line"><span class="bh-date">${esc(ui.edit?dShort(E.date):dLabel(E.date))}</span><span class="bh-time"><small>集合</small>${esc(tLabel(E.time))}</span></span>
         <span class="bh-line"><span class="bh-title">${esc(E.title)}</span>${E.venue?`<span class="bh-venue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>${esc(E.venue)}</span>`:""}<span class="bh-grade">${esc(gradeRange(E.grades))}</span></span>
       </div>
       <div class="bh-side"><span class="bh-state${E.confirmed?" done":""}">${E.confirmed?"確定":"下書き"}</span>${E.carLimit?`<span class="bh-limit${over?" over":""}" title="配車制限 ${E.carLimit}台"><small>配車制限</small><b>${E.carLimit}台</b>${over?`<small>今${B.cars.length}台</small>`:""}</span>`:""}</div>
-    </div>${rows}${lost}${absentRow(E)}${legend}</div>`;
+    </div>${rows}${lost}${absentRow(E)}${ui.edit?"":legend}</div>`;
 }
 function noRoster(){return `<div class="card empty"><p class="h">まだ名簿がありません</p><p class="muted">最初に「名簿」で家庭と子どもを登録してね。Excelの名簿を「まとめて登録」に貼り付けると早いよ。</p><button class="btn primary" data-act="tab" data-v="roster">名簿のページへ</button></div>`}
 function viewBoard(){
@@ -589,7 +626,7 @@ function viewBoard(){
   const head=`${ui.edit?"":evTabs(false)}`;
   if(!E.board)return `<div class="stack">${head}<div class="card empty"><p class="h">${esc(evName(E))}の配車はまだありません</p><p class="muted">配車係のページで「自動で割り振る」を押すと、回答からボードが作られます。</p><button class="btn primary" data-act="tab" data-v="admin">配車係のページへ</button></div></div>`;
   if(ui.sel&&(!info(ui.sel)||!onBoard(E,ui.sel)))ui.sel=null;
-  const editbar=ui.edit?`<div class="editbar"><span>${ui.sel?`「${esc(info(ui.sel).label)}」を乗せる車をタップ`:"人をドラッグして乗せたい車へ（×で車を外す）"}</span><button class="btn small" data-act="editToggle">手直しを終える</button></div>`:"";
+  const editbar=ui.edit?`<div class="editbar"><button class="btn small" data-act="undo" ${ui.undo.length?"":"disabled"} aria-label="1つ戻す">↶ 戻す</button><button class="btn small" data-act="redo" ${ui.redo.length?"":"disabled"} aria-label="やり直す">↷ やり直す</button><button class="btn small eb-done" data-act="editToggle">手直しを終える</button>${ui.sel?`<span class="eb-hint">「${esc(info(ui.sel).label)}」を乗せる車をタップ</span>`:""}</div>`:"";
   return `<div class="stack">${head}
     ${editbar}${boardHTML(E)}
     ${ui.edit?"":`<div class="btns"><button class="btn primary" data-act="saveImg">画像にしてLINEに貼る</button><button class="btn" data-act="editToggle">手直しする</button></div>`}
@@ -667,7 +704,7 @@ function viewAdmin(){
     </div>
     <div class="card"><p class="sec">${esc(evName(E))}の配車</p>
       <p class="muted" style="margin:0">このイベントに回答済み：<b>${D.families.filter(f=>evAnswer(f.id,E.id)).length}/${D.families.length}家庭</b>（イベントを後から追加したときは、回答し直してもらってね）</p>
-      <p class="muted" style="margin:0">指導者は同じ車 → 自分の家庭の車 → 同じ学年、の順で自動で組みます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
+      <p class="muted" style="margin:0">指導者は1号車 → 自分の家庭の車 → 学年ごと、の順で自動で組みます。車を出さずに同行する母は、できるだけ母号に乗せます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
       ${E.board&&E.carLimit&&E.board.cars.length>E.carLimit?`<p class="pill" style="justify-self:start">配車制限を${E.board.cars.length-E.carLimit}台オーバーしています</p>`:""}
       <button class="btn primary wide" data-act="auto">${E.board?"回答から自動で割り振り直す":"回答から自動で割り振る"}</button>
       ${E.board?`<div class="btns"><button class="btn" data-act="goEdit" data-id="${E.id}" style="flex:1">ボードを手直し</button><button class="btn" data-act="confirm" style="flex:1" ${E.confirmed&&!E.board.changed.length?"disabled":""}>${E.confirmed?(E.board.changed.length?"変更を確定":"確定済み"):"配車を確定"}</button></div>
@@ -742,6 +779,7 @@ function render(){
   let ss=null,se=null;try{if(fid&&ae.type==="text"){ss=ae.selectionStart;se=ae.selectionEnd}}catch(e){}
   const v={board:viewBoard,answer:viewAnswer,admin:viewAdmin,roster:viewRoster}[ui.tab]||viewBoard;
   document.getElementById("app").innerHTML=header()+`<main class="wrap">${v()}</main>`+tabs()+overlays();
+  document.body.classList.toggle("editing",!!document.querySelector(".editbar"));
   syncTyping();
   const hd=document.querySelector(".top");if(hd)document.documentElement.style.setProperty("--hdr",hd.offsetHeight+"px");
   window.scrollTo(0,y);
@@ -753,22 +791,30 @@ function render(){
 function draftOk(t){if(ui.draft&&ui.draft.ev&&ui.draft.ev[t.dataset.ev])return true;render();return false}
 const acts={
   noop(){},
-  tab(t){ui.tab=t.dataset.v;ui.sel=null;if(ui.tab!=="board")ui.edit=false;savePref();render();window.scrollTo(0,0)},
-  pickEv(t){ui.ev=t.dataset.id;ui.sel=null;savePref();render()},
-  editToggle(){ui.edit=!ui.edit;ui.sel=null;render()},
-  goEdit(t){if(t.dataset.id)ui.ev=t.dataset.id;ui.tab="board";ui.edit=true;ui.sel=null;savePref();render();window.scrollTo(0,0)},
+  tab(t){ui.tab=t.dataset.v;ui.sel=null;ui.undo=[];ui.redo=[];if(ui.tab!=="board")ui.edit=false;savePref();render();window.scrollTo(0,0)},
+  pickEv(t){ui.ev=t.dataset.id;ui.sel=null;ui.undo=[];ui.redo=[];savePref();render()},
+  editToggle(){ui.edit=!ui.edit;ui.sel=null;ui.undo=[];ui.redo=[];render();window.scrollTo(0,0)},
+  undo(){const u=ui.undo[ui.undo.length-1];if(!u)return;const E=D.events.find(x=>x.id===u.eid);
+    if(!E||!E.board||boardSig(E.board)!==u.after){ui.undo=[];ui.redo=[];toast("ほかの人がボードを変えたので、戻せませんでした");render();return}
+    ui.undo.pop();ui.redo.push(u);ui.sel=null;commit(`${evName(E)}：手直しを1つ戻した`,()=>{E.board=JSON.parse(u.before)})},
+  redo(){const u=ui.redo[ui.redo.length-1];if(!u)return;const E=D.events.find(x=>x.id===u.eid);
+    if(!E||!E.board||boardSig(E.board)!==u.before){ui.undo=[];ui.redo=[];toast("ほかの人がボードを変えたので、やり直せませんでした");render();return}
+    ui.redo.pop();ui.undo.push(u);ui.sel=null;commit(`${evName(E)}：手直しをやり直した`,()=>{E.board=JSON.parse(u.after)})},
+  goEdit(t){if(t.dataset.id)ui.ev=t.dataset.id;ui.tab="board";ui.edit=true;ui.sel=null;ui.undo=[];ui.redo=[];savePref();render();window.scrollTo(0,0)},
   chip(t,e){if(!ui.edit)return;e.stopPropagation();const k=t.dataset.k;
     if(ui.sel&&ui.sel!==k){const row=t.closest(".car[data-car]");const src=[...document.querySelectorAll("#board .chip[data-k]")].find(x=>x.dataset.k===ui.sel);if(row&&src&&src.closest(".car")!==row){moveItem(ui.sel,row.dataset.car);return}}
     ui.sel=ui.sel===k?null:k;render()},
   drop(t){if(!ui.edit||!ui.sel)return;moveItem(ui.sel,t.dataset.car)},
   removeCar(t,e){e.stopPropagation();const E0=curEv();if(!E0||!E0.board)return;const eid=E0.id,id=t.dataset.car;const c0=E0.board.cars.find(x=>x.id===id);if(!c0)return;
-    ask(`${carName(c0)}を外しますか？\n乗っていた人は「まだ乗る車なし」に移ります。`,"外す",()=>{const E=D.events.find(x=>x.id===eid);const c=E&&E.board&&E.board.cars.find(x=>x.id===id);if(!c)return;commit(`${evName(E)}：${carName(c)}を外した`,()=>{
+    ask(`${carName(c0)}を外しますか？\n乗っていた人は「まだ乗る車なし」に移ります。`,"外す",()=>{const E=D.events.find(x=>x.id===eid);const c=E&&E.board&&E.board.cars.find(x=>x.id===id);if(!c)return;commit(`${evName(E)}：${carName(c)}を外した`,()=>undoable(E,()=>{
       E.board.cars=E.board.cars.filter(x=>x!==c);E.board.unassigned.push(...c.items);
-      E.board.unused.push({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:c.tools});if(E.confirmed&&!E.board.changed.includes("removed"))E.board.changed.push("removed")})})},
+      // the driver answered that they go even without driving: they now need a seat
+      const a=evAnswer(c.familyId,E.id),rk=`a:${c.familyId}:${c.who}`;if(a&&a[c.who+"Ride"]&&!onBoard(E,rk))E.board.unassigned.push(rk);
+      E.board.unused.push({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:c.tools});if(E.confirmed&&!E.board.changed.includes("removed"))E.board.changed.push("removed")}))})},
   useCar(t){const E=curEv();if(!E||!E.board)return;const id=t.dataset.car;const c=E.board.unused.find(x=>x.id===id);if(!c)return;
-    commit(`${evName(E)}：${carName(c)}を追加`,()=>{E.board.unused=E.board.unused.filter(x=>x!==c);
+    commit(`${evName(E)}：${carName(c)}を追加`,()=>undoable(E,()=>{E.board.unused=E.board.unused.filter(x=>x!==c);
       removeEverywhere(E,`a:${c.familyId}:${c.who}`);
-      E.board.cars.push(Object.assign({},c,{items:[]}));if(E.confirmed)markChanged(E,[c.id])})},
+      E.board.cars.push(Object.assign({},c,{items:[]}));if(E.confirmed)markChanged(E,[c.id])}))},
   auto(){const E0=curEv();if(!E0)return;const eid=E0.id;const run=()=>{const E=D.events.find(x=>x.id===eid);if(!E)return;commit(`${evName(E)}：自動で割り振り`,()=>{E.board=autoAssign(D,E,E.board&&E.board.away||[]);E.board.at=Date.now();E.confirmed=false});ui.tab="board";savePref();render();window.scrollTo(0,0)};
     if(E0.board)ask("このイベントのボードを作り直します。\n手直しした内容は上書きされます（履歴から戻せます）。","作り直す",run);else run()},
   confirm(){const E=curEv();if(!E||!E.board)return;commit(`${evName(E)}：${E.confirmed?"配車の変更を確定":"配車を確定"}`,()=>{E.confirmed=true;E.board.changed=[]});toast("確定しました。画像にしてLINEに貼ってね")},
@@ -814,6 +860,8 @@ const acts={
     Object.values(next.ev).forEach(x=>{x.absent=(x.absent||[]).filter(id=>mem(id));x.siblings=(x.siblings||[]).filter(id=>mem(id))});
     ui.draft=null;
     commit(`${f.name}家が${had?"回答を変更":"回答"}`,()=>{
+      // boards already made follow the new answer (only what changed)
+      D.events.forEach(e=>{if(e.board)syncBoard(e,fid,had&&had.ev[e.id],next.ev[e.id])});
       D.events.forEach(e=>{if(!e.confirmed||!e.board)return;const before=JSON.stringify(had&&had.ev[e.id]?had.ev[e.id]:defaultEv());if(before!==JSON.stringify(next.ev[e.id]))D.alerts.push({id:uid("a"),eid:e.id,fid,text:`${evName(e)}：${f.name}家が確定後に回答を変更しました`,at:Date.now()})});
       D.answers[fid]=next});
     toast(had?"回答を更新しました":"回答しました。ありがとう！")},
@@ -840,12 +888,37 @@ const acts={
       if(!ops.length){toast("戻すものはありませんでした");return}
       send(ops,`「${h.text}」の前に戻した`,changes);build();ui.stale=false;ui.draft=null;render();toast("戻しました")})}
 };
+// undo / redo of this phone's hand edits on a board (moves, removing or adding a car)
+const boardSig=B=>JSON.stringify(B?{cars:B.cars.map(c=>({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:!!c.tools,items:c.items})),unassigned:B.unassigned,unused:B.unused.map(c=>({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:!!c.tools})),away:B.away||[],changed:B.changed||[],at:B.at||0}:null);
+function undoable(E,fn){const before=boardSig(E.board);fn();const after=boardSig(E.board);if(ui.edit&&before!==after){ui.undo.push({eid:E.id,before,after});if(ui.undo.length>50)ui.undo.shift();ui.redo=[]}}
 function onBoard(E,k){const B=E.board;return !!B&&(B.unassigned.includes(k)||(B.away||[]).includes(k)||B.cars.some(c=>c.items.includes(k)))}
 function removeEverywhere(E,k){const B=E.board;if(!B)return[];const from=[];B.cars.forEach(c=>{if(c.items.includes(k)){c.items=c.items.filter(x=>x!==k);from.push(c.id)}});B.unassigned=B.unassigned.filter(x=>x!==k);B.away=(B.away||[]).filter(x=>x!==k);return from}
 function markChanged(E,ids){ids.forEach(id=>{if(id!=="un"&&id!=="away"&&!E.board.changed.includes(id))E.board.changed.push(id)})}
+// A family's answer changed after the board was made: apply only the difference, keep the coordinator's hand edits.
+function syncBoard(E,fid,a0,a1){const B=E&&E.board;if(!B||!a1)return;a0=a0||defaultEv();
+  if(JSON.stringify(a0)===JSON.stringify(a1))return;
+  const sig=c=>JSON.stringify([c.cap,!!c.tools,c.items]);const before=new Map(B.cars.map(c=>[c.id,sig(c)]));
+  const put=k=>{if(!onBoard(E,k))B.unassigned.push(k)};
+  const grades=E.grades||[];
+  ["f","m"].forEach(w=>{const id=fid+":"+w,rk=`a:${fid}:${w}`;
+    const has=!!(a1[w+"Car"]&&a1[w+"Seats"]>=2);const car=B.cars.find(c=>c.id===id),spare=B.unused.find(c=>c.id===id);
+    if(!has){if(car){B.cars=B.cars.filter(c=>c!==car);B.unassigned.push(...car.items)}if(spare)B.unused=B.unused.filter(c=>c!==spare)}
+    else if(car){car.cap=a1[w+"Seats"];car.tools=!!a1.tools;if(!car.tools){const t=car.items.filter(k=>k.startsWith("t:"));if(t.length){car.items=car.items.filter(k=>!k.startsWith("t:"));B.unassigned.push(...t)}}}
+    else if(spare){spare.cap=a1[w+"Seats"];spare.tools=!!a1.tools}
+    else B.unused.push({id,familyId:fid,who:w,cap:a1[w+"Seats"],tools:!!a1.tools});
+    // riding along: on the board when going and not driving one of the board's cars
+    const drives=B.cars.some(c=>c.id===id);
+    if(a1[w+"Ride"]&&!drives)put(rk);else removeEverywhere(E,rk);
+  });
+  D.members.filter(m=>m.familyId===fid).forEach(m=>{const k="k:"+m.id;const target=m.kind==="player"&&grades.includes(m.grade);
+    if(target){const was=a0.absent.includes(m.id),is=a1.absent.includes(m.id);if(is&&!was)removeEverywhere(E,k);if(was&&!is)put(k)}
+    else{const was=a0.siblings.includes(m.id),is=a1.siblings.includes(m.id);if(is&&!was)put(k);if(was&&!is)removeEverywhere(E,k)}});
+  if(E.confirmed){const ids=B.cars.filter(c=>before.get(c.id)!==sig(c)).map(c=>c.id);markChanged(E,ids);
+    if([...before.keys()].some(id=>!B.cars.some(c=>c.id===id))&&!B.changed.includes("removed"))B.changed.push("removed")}
+}
 function moveItem(k,to){fresh();const E=curEv();if(!E||!E.board)return;if((to!=="un"&&to!=="away"&&!E.board.cars.some(c=>c.id===to))||!info(k)||!onBoard(E,k)){ui.sel=null;render();return}const i=info(k);const dest=to==="un"?"乗る車なし":to==="away"?"欠席":carName(E.board.cars.find(c=>c.id===to));
-  commit(`${evName(E)}：${i.label}を${dest}へ移動`,()=>{const from=removeEverywhere(E,k);if(to==="un")E.board.unassigned.push(k);else if(to==="away")(E.board.away=E.board.away||[]).push(k);else E.board.cars.find(c=>c.id===to).items.push(k);
-    if(E.confirmed)markChanged(E,from.concat(to))});ui.sel=null;render()}
+  commit(`${evName(E)}：${i.label}を${dest}へ移動`,()=>undoable(E,()=>{const from=removeEverywhere(E,k);if(to==="un")E.board.unassigned.push(k);else if(to==="away")(E.board.away=E.board.away||[]).push(k);else E.board.cars.find(c=>c.id===to).items.push(k);
+    if(E.confirmed)markChanged(E,from.concat(to))}));ui.sel=null;render()}
 
 /* ---------- drag & drop on the board ---------- */
 let drag=null,suppressClick=false;
