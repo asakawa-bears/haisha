@@ -270,6 +270,15 @@ body.editing .wrap>.stack{gap:8px}
 .board.editing .bh-limit b{font-size:13px}
 .board.editing .bh-limit:not(.over){display:none}
 .board.editing .car{padding:4px 0}
+
+.chip.tag-chip{background:#5b3fa8;color:#fff;border-radius:6px;font-size:11px;letter-spacing:0;line-height:1.15}
+.car-items .chip.tag-chip{grid-column:span 2;width:100%;max-width:84px;aspect-ratio:auto;height:36px;font-size:11px}
+.car-mv{display:grid;gap:3px;align-content:center;justify-items:center}
+.car-mv button{width:28px;height:26px;border-radius:6px;border:1.5px solid #9aa2aa;background:#fff;color:var(--wb-ink);font-size:11px;line-height:1;padding:0;cursor:pointer}
+.car-mv button:disabled{opacity:.3;cursor:default}
+.board.editing .car[data-car]:not([data-car=un]):not([data-car=away]){grid-template-columns:48px minmax(0,1fr) 28px}
+.editbar .eb-hint{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.editbar .eb-hint .btn{flex:none}
 </style>
 
 </head>
@@ -280,12 +289,13 @@ body.editing .wrap>.stack{gap:8px}
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-31 17:00";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-31 17:41";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
 const GCOL=["#f1f9f2","#d3eed8","#a9dcb3","#7cc58b","#4a9f5d","#2a7f3f","#1c6a31","#0c4520"];
 const gInk=g=>g>=5?"#ffffff":"#1b1f23";
+const TAG_PRESETS=["審判","駐車場係"];
 const TOOL_SEATS=2; // 道具 takes the room of two people
 const gLabel=g=>(GRADES.find(x=>x.v===g)||GRADES[0]).l;
 const WD="日月火水木金土";
@@ -340,7 +350,7 @@ async function firebaseStore(){
 /* ---------- state ---------- */
 let D={families:[],members:[],coaches:[],events:[],answers:{},alerts:[],deadline:""},P={me:"",tab:"board",ev:""};
 try{const raw=localStorage.getItem(PREF);if(raw)P=Object.assign(P,JSON.parse(raw))}catch(e){}
-const ui={tab:P.tab||"board",ev:P.ev||"",edit:false,sel:null,undo:[],redo:[],ansFam:P.me||"",draft:null,modal:null,img:null,bulk:"",ready:false,loadErr:null,stale:false,dirty:false};
+const ui={tab:P.tab||"board",ev:P.ev||"",edit:false,sel:null,undo:[],redo:[],tagText:"",ansFam:P.me||"",draft:null,modal:null,img:null,bulk:"",ready:false,loadErr:null,stale:false,dirty:false};
 let store=null,H=null,histUnsub=null,histTrimmed=false;
 const raw={};COLS.forEach(c=>raw[c]={});
 const got=new Set();
@@ -530,15 +540,18 @@ function info(k){
   if(k.startsWith("k:")){const m=mem(k.slice(2));if(!m)return null;return{type:"k",label:m.name,cls:"kid"+(m.grade<=1?" light":""),style:`background:${GCOL[m.grade]};color:${gInk(m.grade)}`,title:`${m.name}（${gLabel(m.grade)}${m.kind==="sibling"?"・兄弟児":""}）`,sort:20-m.grade}}
   if(k.startsWith("a:")){const[,fid,w]=k.split(":");const f=fam(fid);if(!f)return null;return{type:"a",label:f.name,cls:"adult "+(w==="f"?"father":"mother"),title:`${f.name}（${w==="f"?"父":"母"}）`,sort:5}}
   if(k.startsWith("c:")){const c=D.coaches.find(x=>x.id===k.slice(2));if(!c)return null;return{type:"c",label:c.name,cls:"staff",title:c.name,sort:0}}
+  if(k.startsWith("g:")){const i=k.indexOf(":",2);const label=i>0?k.slice(i+1):"";if(!label)return null;return{type:"g",label,cls:"tag-chip",title:label+"（タグ）",sort:-1}}
   if(k==="t:dougu")return{type:"t",label:"道具",cls:"tool",title:"道具（2人分の席を使う）",sort:99};
   if(k==="t:touban")return{type:"t",label:"当番道具",cls:"tool square",title:"当番道具",sort:99};
   return null;
 }
 const short=l=>{const c=[...l];return c.length>4?c.slice(0,3).join("")+"…":l};
+const tagText=l=>{const c=[...l];return c.length>6?c.slice(0,5).join("")+"…":l};
 function chip(k){const i=info(k);if(!i)return"";
-  const long=[...short(i.label)].length>=4?" long":"";
+  const txt=i.type==="g"?tagText(i.label):short(i.label);
+  const long=i.type!=="g"&&[...txt].length>=4?" long":"";
   const sel=ui.sel===k?" sel":"";
-  return `<button class="chip ${i.cls}${long}${sel}" ${i.style?`style="${i.style}"`:""} data-act="chip" data-k="${esc(k)}" title="${esc(i.title)}" aria-label="${esc(i.title)}" ${ui.edit?"":"tabindex=\"-1\""}>${esc(short(i.label))}</button>`;
+  return `<button class="chip ${i.cls}${long}${sel}" ${i.style?`style="${i.style}"`:""} data-act="chip" data-k="${esc(k)}" title="${esc(i.title)}" aria-label="${esc(i.title)}" ${ui.edit?"":"tabindex=\"-1\""}>${esc(txt)}</button>`;
 }
 function staticChip(k){const i=info(k);if(!i)return"";const long=[...i.label].length>=4?" long":"";
   return `<span class="chip ${i.cls}${long} away" ${i.style?`style="${i.style}"`:""} title="${esc(i.title)}（欠席）">${esc(i.label)}</span>`}
@@ -554,12 +567,13 @@ function absentRow(E){
   // from the answers + anyone the coordinator dragged here; minus anyone placed in a car
   const keys=[...new Set(coaches.map(c=>"c:"+c.id).concat(kids.map(m=>"k:"+m.id),B.away||[]))].filter(k=>!onBoard.has(k)&&info(k));
   const drop=ui.edit&&ui.sel&&!keys.includes(ui.sel);
-  return `<div class="car absent${drop?" drop":""}" data-act="drop" data-car="away"><div class="car-head"><span class="car-absent-label">欠席<br>${keys.length}人</span></div><div class="car-items">${keys.length?keys.map(chip).join(""):`<span class="absent-none">なし</span>`}</div></div>`}
+  return `<div class="car absent${drop?" drop":""}" data-act="drop" data-car="away"><div class="car-head"><span class="car-absent-label">欠席<br>${keys.filter(k=>!isThing(k)).length}人</span></div><div class="car-items">${keys.length?keys.map(chip).join(""):`<span class="absent-none">なし</span>`}</div></div>`}
 const carName=c=>{const f=fam(c.familyId);return `${f?f.name:"?"}${c.who==="f"?"父号":"母号"}`};
 // cars are numbered 1号, 2号… in the roster's family order (father's car before mother's)
 const famRank=id=>{const i=D.families.findIndex(f=>f.id===id);return i<0?1e9:i};
 const carsInOrder=list=>list.slice().sort((a,b)=>famRank(a.familyId)-famRank(b.familyId)||(a.who==="f"?0:1)-(b.who==="f"?0:1));
-const used=c=>1+c.items.filter(k=>!k.startsWith("t:")).length+(c.items.includes("t:dougu")?TOOL_SEATS:0);
+const isThing=k=>k.startsWith("t:")||k.startsWith("g:");   // tools and tags: no seat (道具 is counted separately)
+const used=c=>1+c.items.filter(k=>!isThing(k)).length+(c.items.includes("t:dougu")?TOOL_SEATS:0);
 function prune(){
   const ok=k=>!!info(k);
   D.events.forEach(ev=>{ev.coaches=(ev.coaches||[]).filter(id=>D.coaches.some(c=>c.id===id));const B=ev.board;if(!B)return;
@@ -597,7 +611,7 @@ function evTabs(withAdd){
 function boardHTML(E){
   const B=E.board;
   const order=k=>(info(k)||{sort:50}).sort;
-  const rows=carsInOrder(B.cars).map((c,ci)=>{
+  const rows=B.cars.map((c,ci)=>{
     const f=fam(c.familyId);const u=used(c);
     const people=c.items.filter(k=>!k.startsWith("t:")).sort((a,b)=>order(a)-order(b));
     const tools=c.items.filter(k=>k.startsWith("t:"));
@@ -610,12 +624,13 @@ function boardHTML(E){
         <span class="car-seat${u>c.cap?" over":""}" title="乗車${u}人／定員${c.cap}人">${u}/${c.cap}</span>${ui.edit?`<button class="car-x" data-act="removeCar" data-car="${c.id}" aria-label="${esc(carName(c))}を外す" title="この車を外す">×</button>`:""}
       </span></div>
       <div class="car-items">${people.map(chip).join("")}${tools.map(chip).join("")}</div>
+      ${ui.edit?`<span class="car-mv"><button data-act="carMove" data-car="${c.id}" data-d="-1" aria-label="${esc(carName(c))}を前へ" ${ci===0?"disabled":""}>▲</button><button data-act="carMove" data-car="${c.id}" data-d="1" aria-label="${esc(carName(c))}を後ろへ" ${ci===B.cars.length-1?"disabled":""}>▼</button></span>`:""}
     </div>`}).join("");
   const lostKeys=B.unassigned.concat(missingKeys(E));
   const lost=lostKeys.length||ui.edit?`<div class="car lost${ui.edit&&ui.sel&&!lostKeys.includes(ui.sel)?" drop":""}" data-act="drop" data-car="un">
-      <div class="car-head"><span class="car-lost-label">まだ<br>乗る車<br>なし<br>${lostKeys.filter(k=>!k.startsWith("t:")).length}人</span></div>
+      <div class="car-head"><span class="car-lost-label">まだ<br>乗る車<br>なし<br>${lostKeys.filter(k=>!isThing(k)).length}人</span></div>
       <div class="car-items">${lostKeys.map(chip).join("")}</div></div>`:"";
-  const legend=`<div class="legend"><span><i style="background:var(--father)"></i>父</span><span><i style="background:var(--mother)"></i>母</span><span><i style="background:var(--staff)"></i>指導者</span><span><i style="background:var(--tool);width:22px"></i>道具</span><span><span class="grades">${[7,6,5,4,3,2,1,0].map(g=>`<i style="background:${GCOL[g]};${g<=1?"border:1px solid #93c39e":""}"></i>`).join("")}</span>子ども（中学以上→未就学）</span><span>四角＝大人／丸＝子ども</span><span>太枠＝運転手</span><span>右下の数字＝乗車人数／定員</span></div>`;
+  const legend=`<div class="legend"><span><i style="background:var(--father)"></i>父</span><span><i style="background:var(--mother)"></i>母</span><span><i style="background:var(--staff)"></i>指導者</span><span><i style="background:var(--tool);width:22px"></i>道具</span><span><i style="background:#5b3fa8;width:22px"></i>タグ</span><span><span class="grades">${[7,6,5,4,3,2,1,0].map(g=>`<i style="background:${GCOL[g]};${g<=1?"border:1px solid #93c39e":""}"></i>`).join("")}</span>子ども（中学以上→未就学）</span><span>四角＝大人／丸＝子ども</span><span>太枠＝運転手</span><span>右下の数字＝乗車人数／定員</span></div>`;
   const over=E.carLimit&&B.cars.length>E.carLimit;
   return `<div class="board${ui.edit?" editing":""}" id="board">
     <div class="board-head">
@@ -634,10 +649,11 @@ function viewBoard(){
   const head=`${ui.edit?"":evTabs(false)}`;
   if(!E.board)return `<div class="stack">${head}<div class="card empty"><p class="h">${esc(evName(E))}の配車はまだありません</p><p class="muted">配車係のページで「自動で割り振る」を押すと、回答からボードが作られます。</p><button class="btn primary" data-act="tab" data-v="admin">配車係のページへ</button></div></div>`;
   if(ui.sel&&(!info(ui.sel)||!onBoard(E,ui.sel)))ui.sel=null;
-  const editbar=ui.edit?`<div class="editbar"><button class="btn small" data-act="undo" ${ui.undo.length?"":"disabled"} aria-label="1つ戻す">↶ 戻す</button><button class="btn small" data-act="redo" ${ui.redo.length?"":"disabled"} aria-label="やり直す">↷ やり直す</button><button class="btn small eb-done" data-act="editToggle">手直しを終える</button>${ui.sel?`<span class="eb-hint">「${esc(info(ui.sel).label)}」を乗せる車をタップ</span>`:""}</div>`:"";
+  const editbar=ui.edit?`<div class="editbar"><button class="btn small" data-act="undo" ${ui.undo.length?"":"disabled"} aria-label="1つ戻す">↶ 戻す</button><button class="btn small" data-act="redo" ${ui.redo.length?"":"disabled"} aria-label="やり直す">↷ やり直す</button><button class="btn small eb-done" data-act="editToggle">手直しを終える</button>${ui.sel?`<div class="eb-hint"><span>「${esc(info(ui.sel).label)}」を${ui.sel.startsWith("g:")?"付ける":"乗せる"}車をタップ</span>${ui.sel.startsWith("g:")?`<button class="btn small" data-act="delTag">このタグを消す</button>`:""}</div>`:""}</div>`:"";
   return `<div class="stack">${head}
     ${editbar}${boardHTML(E)}
     ${ui.edit?"":`<div class="btns"><button class="btn primary" data-act="saveImg">画像にしてLINEに貼る</button><button class="btn" data-act="editToggle">手直しする</button></div>`}
+    ${ui.edit?`<div class="card tagcard"><p class="sec">タグ（審判号・駐車場係など）</p><p class="muted" style="margin:0">タグを追加してから、付けたい車をタップ。タグは席を使いません。</p><div class="btns">${TAG_PRESETS.map(l=>`<button class="btn small" data-act="addTag" data-label="${esc(l)}">＋ ${esc(l)}</button>`).join("")}</div><div class="row" style="flex-wrap:nowrap;gap:8px"><input type="text" id="tagText" class="input" data-in="tagText" maxlength="10" placeholder="ほかのタグ（例：本部）" value="${esc(ui.tagText)}" aria-label="タグの名前" style="flex:1;min-width:0"><button class="btn small" data-act="addTag" style="flex:none">追加</button></div></div>`:""}
     ${ui.edit&&E.board.unused.length?`<div class="card"><p class="sec">使っていない車</p>${carsInOrder(E.board.unused).map(c=>`<div class="row" style="flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc(carName(c))}（${c.cap}人乗り${c.tools?"・道具OK":""}）</span><button class="btn small" style="flex:none" data-act="useCar" data-car="${c.id}">この車も使う</button></div>`).join("")}</div>`:""}
   </div>`;
 }
@@ -712,7 +728,7 @@ function viewAdmin(){
     </div>
     <div class="card"><p class="sec">${esc(evName(E))}の配車</p>
       <p class="muted" style="margin:0">このイベントに回答済み：<b>${D.families.filter(f=>evAnswer(f.id,E.id)).length}/${D.families.length}家庭</b>（イベントを後から追加したときは、回答し直してもらってね）</p>
-      <p class="muted" style="margin:0">車は名簿の家庭の順に1号車から並びます。指導者は1号車 → 自分の家庭の車 → 学年ごと、の順で自動で組みます。車を出さずに同行する母は、できるだけ母号に乗せます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
+      <p class="muted" style="margin:0">車は名簿の家庭の順に1号車から並びます（手直しで並べ替えもできます）。指導者は1号車 → 自分の家庭の車 → 学年ごと、の順で自動で組みます。車を出さずに同行する母は、できるだけ母号に乗せます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
       ${E.board&&E.carLimit&&E.board.cars.length>E.carLimit?`<p class="pill" style="justify-self:start">配車制限を${E.board.cars.length-E.carLimit}台オーバーしています</p>`:""}
       <button class="btn primary wide" data-act="auto">${E.board?"回答から自動で割り振り直す":"回答から自動で割り振る"}</button>
       ${E.board?`<div class="btns"><button class="btn" data-act="goEdit" data-id="${E.id}" style="flex:1">ボードを手直し</button><button class="btn" data-act="confirm" style="flex:1" ${E.confirmed&&!E.board.changed.length?"disabled":""}>${E.confirmed?(E.board.changed.length?"変更を確定":"確定済み"):"配車を確定"}</button></div>
@@ -742,7 +758,7 @@ function viewRoster(){
       <button class="btn small" data-act="addMem" data-id="${f.id}" style="justify-self:start">＋ 子どもを追加</button></div>`}).join("");
   const hist=(H||[]).slice(0,20).map(h=>`<div><span><time>${stamp(h.at)}・${esc(h.who)}</time>${esc(h.text)}</span><button class="btn small" data-act="restore" data-id="${esc(h.id)}">この前に戻す</button></div>`).join("");
   return `<div class="stack">
-    <div class="card"><p class="sec">家庭と子ども</p><p class="muted" style="margin:0">誰でも修正できます。変更は下の履歴に残り、元に戻せます。▲▼で家庭の順番を変えると、ボードの1号車からの並びもこの順になります。</p>${famHTML}
+    <div class="card"><p class="sec">家庭と子ども</p><p class="muted" style="margin:0">誰でも修正できます。変更は下の履歴に残り、元に戻せます。▲▼で家庭の順番を変えると、次に自動で割り振るとき、この順に1号車から並びます。</p>${famHTML}
       <button class="btn" data-act="addFam">＋ 家庭を追加</button></div>
     <div class="card"><p class="sec">指導者</p>${D.coaches.map(c=>`<div class="fam-head"><span class="chip staff" style="width:34px;height:34px;font-size:10px"> </span><input type="text" id="cn-${c.id}" value="${esc(c.name)}" data-ch="coach" data-id="${c.id}" maxlength="10" aria-label="指導者名" style="min-height:40px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--surface)"><button class="x" data-act="delCoach" data-id="${c.id}" aria-label="${esc(c.name)}を削除">×</button></div>`).join("")}
       <button class="btn small" data-act="addCoach" style="justify-self:start">＋ 指導者を追加</button></div>
@@ -819,11 +835,20 @@ const acts={
       // the driver answered that they go even without driving: they now need a seat
       const a=evAnswer(c.familyId,E.id),rk=`a:${c.familyId}:${c.who}`;if(a&&a[c.who+"Ride"]&&!onBoard(E,rk))E.board.unassigned.push(rk);
       E.board.unused.push({id:c.id,familyId:c.familyId,who:c.who,cap:c.cap,tools:c.tools});if(E.confirmed&&!E.board.changed.includes("removed"))E.board.changed.push("removed")}))})},
+  carMove(t){const E=curEv();if(!E||!E.board)return;const id=t.dataset.car,d=+t.dataset.d;const L0=E.board.cars;const i=L0.findIndex(c=>c.id===id),j=i+d;if(i<0||j<0||j>=L0.length){render();return}
+    commit(`${evName(E)}：${carName(L0[i])}を${d<0?"前":"後ろ"}へ`,()=>undoable(E,()=>{const L=E.board.cars;[L[i],L[j]]=[L[j],L[i]];if(E.confirmed)markChanged(E,[L[i].id,L[j].id])}))},
+  addTag(t){const E=curEv();if(!E||!E.board)return;const label=String(t.dataset.label||ui.tagText||"").trim().slice(0,10);if(!label){toast("タグの名前を入れてね");return}
+    const k="g:"+uid("g")+":"+label;if(!t.dataset.label){ui.tagText="";const f=document.getElementById("tagText");if(f){f.value="";f.blur()}}
+    ui.sel=k;commit(`${evName(E)}：タグ「${label}」を追加`,()=>undoable(E,()=>E.board.unassigned.push(k)))},
+  delTag(){const E=curEv();const k=ui.sel;if(!E||!E.board||!k||!k.startsWith("g:")||!info(k))return;const label=info(k).label;ui.sel=null;
+    commit(`${evName(E)}：タグ「${label}」を消した`,()=>undoable(E,()=>{const from=removeEverywhere(E,k);if(E.confirmed)markChanged(E,from)}))},
   useCar(t){const E=curEv();if(!E||!E.board)return;const id=t.dataset.car;const c=E.board.unused.find(x=>x.id===id);if(!c)return;
     commit(`${evName(E)}：${carName(c)}を追加`,()=>undoable(E,()=>{E.board.unused=E.board.unused.filter(x=>x!==c);
       removeEverywhere(E,`a:${c.familyId}:${c.who}`);
-      E.board.cars.push(Object.assign({},c,{items:[]}));if(E.confirmed)markChanged(E,[c.id])}))},
-  auto(){const E0=curEv();if(!E0)return;const eid=E0.id;const run=()=>{const E=D.events.find(x=>x.id===eid);if(!E)return;commit(`${evName(E)}：自動で割り振り`,()=>{E.board=autoAssign(D,E,E.board&&E.board.away||[]);E.board.at=Date.now();E.confirmed=false});ui.tab="board";savePref();render();window.scrollTo(0,0)};
+      // a car put back goes where its family stands in the roster order
+      const rk=x=>famRank(x.familyId)*2+(x.who==="f"?0:1);const at=E.board.cars.findIndex(x=>rk(x)>rk(c));const nc=Object.assign({},c,{items:[]});if(at<0)E.board.cars.push(nc);else E.board.cars.splice(at,0,nc);
+      if(E.confirmed)markChanged(E,[c.id])}))},
+  auto(){const E0=curEv();if(!E0)return;const eid=E0.id;const run=()=>{const E=D.events.find(x=>x.id===eid);if(!E)return;commit(`${evName(E)}：自動で割り振り`,()=>{const old=E.board;E.board=autoAssign(D,E,old&&old.away||[]);keepTags(old,E.board);E.board.at=Date.now();E.confirmed=false});ui.tab="board";savePref();render();window.scrollTo(0,0)};
     if(E0.board)ask("このイベントのボードを作り直します。\n手直しした内容は上書きされます（履歴から戻せます）。","作り直す",run);else run()},
   confirm(){const E=curEv();if(!E||!E.board)return;commit(`${evName(E)}：${E.confirmed?"配車の変更を確定":"配車を確定"}`,()=>{E.confirmed=true;E.board.changed=[]});toast("確定しました。画像にしてLINEに貼ってね")},
   alertDone(t){const id=t.dataset.id;commit("要対応を対応済みにした",()=>D.alerts=D.alerts.filter(a=>a.id!==id))},
@@ -903,6 +928,8 @@ const boardSig=B=>JSON.stringify(B?{cars:B.cars.map(c=>({id:c.id,familyId:c.fami
 function undoable(E,fn){const before=boardSig(E.board);fn();const after=boardSig(E.board);if(ui.edit&&before!==after){ui.undo.push({eid:E.id,before,after});if(ui.undo.length>50)ui.undo.shift();ui.redo=[]}}
 function onBoard(E,k){const B=E.board;return !!B&&(B.unassigned.includes(k)||(B.away||[]).includes(k)||B.cars.some(c=>c.items.includes(k)))}
 function removeEverywhere(E,k){const B=E.board;if(!B)return[];const from=[];B.cars.forEach(c=>{if(c.items.includes(k)){c.items=c.items.filter(x=>x!==k);from.push(c.id)}});B.unassigned=B.unassigned.filter(x=>x!==k);B.away=(B.away||[]).filter(x=>x!==k);return from}
+function keepTags(old,B){if(!old)return;const put=(cid,k)=>{if(B.away.includes(k)||B.unassigned.includes(k)||B.cars.some(c=>c.items.includes(k)))return;const c=B.cars.find(x=>x.id===cid);(c?c.items:B.unassigned).push(k)};
+  old.cars.forEach(c=>c.items.filter(k=>k.startsWith("g:")).forEach(k=>put(c.id,k)));old.unassigned.filter(k=>k.startsWith("g:")).forEach(k=>put(null,k))}
 function markChanged(E,ids){ids.forEach(id=>{if(id!=="un"&&id!=="away"&&!E.board.changed.includes(id))E.board.changed.push(id)})}
 // A family's answer changed after the board was made: apply only the difference, keep the coordinator's hand edits.
 function syncBoard(E,fid,a0,a1){const B=E&&E.board;if(!B||!a1)return;a0=a0||defaultEv();
@@ -968,7 +995,7 @@ function onChange(t){const k=t.dataset.ch;if(k!=="me"&&k!=="ansFam")fresh();
     if(t.tagName==="SELECT")t.blur();return}
   if(k==="coach"){const c=D.coaches.find(x=>x.id===t.dataset.id);if(!c)return;const v=t.value.trim();if(!v||v===c.name){t.value=c.name;return}commit(`指導者「${c.name}」を「${v}」に変更`,()=>c.name=v,true);return}
 }
-document.addEventListener("input",e=>{const t=e.target;if(t.dataset.in==="comment"&&ui.draft)ui.draft.comment=t.value;if(t.dataset.in==="bulk")ui.bulk=t.value});
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset.in==="comment"&&ui.draft)ui.draft.comment=t.value;if(t.dataset.in==="bulk")ui.bulk=t.value;if(t.dataset.in==="tagText")ui.tagText=t.value});
 boot();
 })();
 </script>
