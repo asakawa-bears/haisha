@@ -252,7 +252,7 @@ select.input option,.mem select option{color:var(--ink);background:var(--surface
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-25 17:00";
+const PREF="haisha-pref"; const APP_VERSION="2026-10-31 09:18";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
@@ -419,7 +419,7 @@ function autoAssign(S,ev,skip){
     const a=ans(f.id); const absent=a?a.absent:[];
     going[f.id]={
       kids:S.members.filter(m=>m.familyId===f.id&&m.kind==="player"&&grades.includes(m.grade)&&!absent.includes(m.id)).map(m=>m.id),
-      sibs:a?a.siblings.filter(id=>S.members.some(m=>m.id===id)):[],
+      sibs:a?a.siblings.filter(id=>{const m=S.members.find(x=>x.id===id);return !!m&&!(m.kind==="player"&&grades.includes(m.grade))}):[],
       fRide:!!(a&&a.fRide), mRide:!!(a&&a.mRide)
     };
   });
@@ -600,7 +600,8 @@ function seg(eid,k,v){return `<div class="seg" role="group"><button class="${v?"
 function stepper(eid,k,v){return `<div class="step"><button data-act="seat" data-ev="${eid}" data-k="${k}" data-d="-1" aria-label="1人減らす">−</button><output>${v}人</output><button data-act="seat" data-ev="${eid}" data-k="${k}" data-d="1" aria-label="1人増やす">＋</button></div>`}
 function evForm(fid,e,i,a){
   const kids=D.members.filter(m=>m.familyId===fid&&m.kind==="player"&&(e.grades||[]).includes(m.grade));
-  const sibs=D.members.filter(m=>m.familyId===fid&&m.kind==="sibling");
+  // 一緒に行ける兄弟：兄弟児と、このイベントの対象学年ではない選手
+  const sibs=D.members.filter(m=>m.familyId===fid&&(m.kind==="sibling"||!(e.grades||[]).includes(m.grade)));
   const sameDay=sortedEvents().filter(x=>x.date===e.date&&x.id!==e.id);
   return `<div class="card">
     <div class="evhead"><b>${esc(dLabel(e.date))} ${esc(e.title)}</b><span>${esc(e.venue)}・集合 ${esc(tLabel(e.time))}・${esc(gradeRange(e.grades))}</span></div>
@@ -615,7 +616,7 @@ function evForm(fid,e,i,a){
     <div class="q"><span class="q-label">④ 配車にならなくても一緒に行く人</span>
       <div class="sub-q"><span>父</span>${seg(e.id,"fRide",a.fRide)}</div>
       <div class="sub-q"><span>母</span>${seg(e.id,"mRide",a.mRide)}</div>
-      ${sibs.length?`<span class="q-help" style="margin-top:4px">一緒に行く兄弟児をタップ</span><div class="toggles">${sibs.map(m=>{const on=a.siblings.includes(m.id);return `<button class="tog${on?" picked":""}" data-act="sib" data-ev="${e.id}" data-id="${m.id}" aria-pressed="${on}"><span class="dot" style="background:${GCOL[m.grade]};${m.grade<=1?"box-shadow:inset 0 0 0 1px #93c39e":""}"></span>${esc(m.name)}（${gLabel(m.grade)}）</button>`}).join("")}</div>`:""}
+      ${sibs.length?`<span class="q-help" style="margin-top:4px">一緒に行く兄弟をタップ</span><div class="toggles">${sibs.map(m=>{const on=a.siblings.includes(m.id);return `<button class="tog${on?" picked":""}" data-act="sib" data-ev="${e.id}" data-id="${m.id}" aria-pressed="${on}"><span class="dot" style="background:${GCOL[m.grade]};${m.grade<=1?"box-shadow:inset 0 0 0 1px #93c39e":""}"></span>${esc(m.name)}（${gLabel(m.grade)}）</button>`}).join("")}</div>`:""}
     </div>
   </div>`;
 }
