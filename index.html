@@ -279,6 +279,11 @@ body.editing .wrap>.stack{gap:8px}
 .board.editing .car[data-car]:not([data-car=un]):not([data-car=away]){grid-template-columns:48px minmax(0,1fr) 28px}
 .editbar .eb-hint{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .editbar .eb-hint .btn{flex:none}
+
+.ans-badge{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700;background:#fde2e4;color:#a1122b;vertical-align:2px}
+.ans-badge.done{background:#dcefe0;color:#1c6a31}
+.evstat{display:grid;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
+.evstat .row b{font-size:14px}
 </style>
 
 </head>
@@ -289,7 +294,7 @@ body.editing .wrap>.stack{gap:8px}
 <script>
 (function(){
 "use strict";
-const PREF="haisha-pref"; const APP_VERSION="2026-10-31 17:57";
+const PREF="haisha-pref"; const APP_VERSION="2026-11-17 16:07";
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let seq=0; const uid=p=>p+Date.now().toString(36)+(seq++).toString(36)+Math.random().toString(36).slice(2,6);
 const GRADES=[{v:0,l:"未就学",s:"未"},{v:1,l:"1年",s:"1年"},{v:2,l:"2年",s:"2年"},{v:3,l:"3年",s:"3年"},{v:4,l:"4年",s:"4年"},{v:5,l:"5年",s:"5年"},{v:6,l:"6年",s:"6年"},{v:7,l:"中学以上",s:"中"}];
@@ -446,6 +451,14 @@ async function boot(){
 }
 
 const evAnswer=(fid,eid)=>{const a=D.answers[fid];return a&&a.ev&&a.ev[eid]?a.ev[eid]:null};
+// answer status is per event: an event asks the families that have a player in its grades
+const ymdToday=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+const upcomingEvents=()=>sortedEvents().filter(e=>(e.date||"")>=ymdToday());
+const evFamilies=E=>D.families.filter(f=>D.members.some(m=>m.familyId===f.id&&m.kind==="player"&&(E.grades||[]).includes(m.grade)));
+const evUnanswered=E=>evFamilies(E).filter(f=>!evAnswer(f.id,E.id));
+// a family's status over the coming events it is asked about: "done", "part" (some left) or "" (nothing to answer)
+const famStatus=fid=>{const ev=upcomingEvents().filter(e=>evFamilies(e).some(f=>f.id===fid));if(!ev.length)return"";return ev.every(e=>evAnswer(fid,e.id))?"done":"part"};
+const appURL=()=>location.origin+location.pathname.replace(/index\.html$/,"");
 
 /* ---------- auto assignment (one event) ---------- */
 function autoAssign(S,ev,skip){
@@ -665,7 +678,7 @@ function evForm(fid,e,i,a){
   const sibs=D.members.filter(m=>m.familyId===fid&&(m.kind==="sibling"||!(e.grades||[]).includes(m.grade)));
   const sameDay=sortedEvents().filter(x=>x.date===e.date&&x.id!==e.id);
   return `<div class="card">
-    <div class="evhead"><b>${esc(dLabel(e.date))} ${esc(e.title)}</b><span>${esc(e.venue)}・集合 ${esc(tLabel(e.time))}・${esc(gradeRange(e.grades))}</span></div>
+    <div class="evhead"><b>${esc(dLabel(e.date))} ${esc(e.title)}${(e.date||"")>=ymdToday()&&evFamilies(e).some(f=>f.id===fid)?(evAnswer(fid,e.id)?'<span class="ans-badge done">回答済み</span>':'<span class="ans-badge">未回答</span>'):""}</b><span>${esc(e.venue)}・集合 ${esc(tLabel(e.time))}・${esc(gradeRange(e.grades))}</span></div>
     ${i>0?`<button class="btn small same" data-act="copyPrev" data-ev="${e.id}" data-i="${i}">上のイベントと同じ回答にする</button>`:""}
     <div class="q"><span class="q-label">① 子どもの参加</span>${kids.length?`<span class="q-help">休む子だけタップしてね</span>
       <div class="toggles">${kids.map(m=>{const off=a.absent.includes(m.id);return `<button class="tog${off?" off":""}" data-act="kid" data-ev="${e.id}" data-id="${m.id}" aria-pressed="${!off}"><span class="dot" style="background:${GCOL[m.grade]}"></span>${esc(m.name)}・${off?"不参加":"参加"}</button>`}).join("")}</div>`:`<span class="q-help" style="margin-top:0">対象学年の子どもはいません。車出し・同行だけ答えてね</span>`}</div>
@@ -686,7 +699,7 @@ function viewAnswer(){
   if(!D.families.length)return noRoster();
   const evs=sortedEvents();
   const fid=ui.ansFam;
-  const sel=`<select class="input" data-ch="ansFam" id="ansFam" aria-label="家庭を選ぶ"><option value="">家庭を選んでね</option>${D.families.map(f=>`<option value="${f.id}" ${fid===f.id?"selected":""}>${esc(f.name)}家${D.answers[f.id]?"（回答済み）":""}</option>`).join("")}</select>`;
+  const sel=`<select class="input" data-ch="ansFam" id="ansFam" aria-label="家庭を選ぶ"><option value="">家庭を選んでね</option>${D.families.map(f=>`<option value="${f.id}" ${fid===f.id?"selected":""}>${esc(f.name)}家${famStatus(f.id)==="done"?"（回答済み）":famStatus(f.id)==="part"?"（未回答あり）":""}</option>`).join("")}</select>`;
   let body="";
   if(fid&&fam(fid)&&evs.length){
     if(!ui.draft||ui.draft._fid!==fid)ui.draft={_fid:fid,comment:"",ev:{},_base:{comment:null,ev:{}}};
@@ -707,9 +720,10 @@ function viewAnswer(){
 }
 function viewAdmin(){
   const E=curEv();
-  const answered=D.families.filter(f=>D.answers[f.id]);
-  const not=D.families.filter(f=>!D.answers[f.id]);
-  const pct=D.families.length?Math.round(answered.length/D.families.length*100):0;
+  const ups=upcomingEvents();
+  const not=D.families.filter(f=>ups.some(e=>evUnanswered(e).some(x=>x.id===f.id)));
+  const evStat=ups.map(e=>{const req=evFamilies(e),no=evUnanswered(e);const pct=req.length?Math.round((req.length-no.length)/req.length*100):100;
+    return `<div class="evstat"><div class="row"><b>${esc(dShort(e.date))} ${esc(e.title||"イベント")}</b><span class="muted">${req.length?`${req.length-no.length}/${req.length}家庭`:"対象学年が未設定"}</span></div><div class="meter"><i style="width:${pct}%"></i></div>${no.length?`<div class="namelist">${no.map(f=>`<span>${esc(f.name)}家</span>`).join("")}</div>`:req.length?`<p class="muted" style="margin:0">全家庭が回答済み</p>`:""}</div>`}).join("");
   const comments=D.families.filter(f=>D.answers[f.id]&&D.answers[f.id].comment);
   const alerts=D.alerts.length?`<div class="card"><div class="row"><p class="sec">要対応</p><span class="pill warn">${D.alerts.length}件</span></div>
     ${D.alerts.map((a,i)=>`<div class="alert"><span><b>${esc(a.text)}</b><br><span class="muted">${stamp(a.at)}</span></span><span class="btns"><button class="btn small" data-act="goEdit" data-id="${a.eid}">ボードを手直し</button><button class="btn small" data-act="alertDone" data-id="${esc(a.id)}">対応済み</button></span></div>`).join("")}</div>`:"";
@@ -727,7 +741,7 @@ function viewAdmin(){
       <button class="btn small danger" data-act="delEv" style="justify-self:start">このイベントを削除</button>
     </div>
     <div class="card"><p class="sec">${esc(evName(E))}の配車</p>
-      <p class="muted" style="margin:0">このイベントに回答済み：<b>${D.families.filter(f=>evAnswer(f.id,E.id)).length}/${D.families.length}家庭</b>（イベントを後から追加したときは、回答し直してもらってね）</p>
+      <p class="muted" style="margin:0">このイベントに回答済み：<b>${evFamilies(E).length-evUnanswered(E).length}/${evFamilies(E).length}家庭</b>（対象学年の子がいる家庭。イベントを後から追加したときは、回答し直してもらってね）</p>
       <p class="muted" style="margin:0">車は名簿の家庭の順に1号車から並びます（手直しで並べ替えもできます）。指導者は1号車 → 自分の家庭の車 → 学年ごと、の順で自動で組みます。車を出さずに同行する母は、できるだけ母号に乗せます。${E.carLimit?`配車制限（${E.carLimit}台）があるときは、乗れる人数の多い車から使います。`:""}</p>
       ${E.board&&E.carLimit&&E.board.cars.length>E.carLimit?`<p class="pill" style="justify-self:start">配車制限を${E.board.cars.length-E.carLimit}台オーバーしています</p>`:""}
       <button class="btn primary wide" data-act="auto">${E.board?"回答から自動で割り振り直す":"回答から自動で割り振る"}</button>
@@ -736,11 +750,10 @@ function viewAdmin(){
     </div>`:`<div class="card empty"><p class="h">イベントがありません</p><button class="btn primary" data-act="addEv">＋ イベントを追加</button></div>`;
   return `<div class="stack">
     ${alerts}
-    <div class="card"><div class="row"><p class="sec">アンケート回答状況</p><span class="pill${not.length?"":" good"}">${answered.length}/${D.families.length}家庭</span></div>
-      <div class="meter"><i style="width:${pct}%"></i></div>
+    <div class="card"><div class="row"><p class="sec">アンケート回答状況</p><span class="pill${not.length?"":" good"}">${not.length?`未回答 ${not.length}家庭`:"全員回答済み"}</span></div>
       <label class="f">回答締切<input type="date" id="deadline" data-ch="deadline" value="${esc(D.deadline)}"></label>
-      ${not.length?`<div><p class="muted" style="margin:0 0 6px">まだ回答していない家庭</p><div class="namelist">${not.map(f=>`<span>${esc(f.name)}家</span>`).join("")}</div></div>
-      <button class="btn" data-act="copyRemind">リマインド文をコピー</button><div id="remindText" class="remind" aria-label="リマインド文">${esc(remindText(not))}</div>`:`<p class="muted" style="margin:0">全家庭が回答済み</p>`}
+      ${ups.length?`<p class="muted" style="margin:0">イベントごとの回答（対象学年の子がいる家庭）</p>${evStat}`:`<p class="muted" style="margin:0">これからのイベントはありません</p>`}
+      ${not.length?`<button class="btn" data-act="copyRemind">リマインド文をコピー</button><div id="remindText" class="remind" aria-label="リマインド文">${esc(remindText())}</div>`:""}
     </div>
     ${comments.length?`<div class="card"><p class="sec">その他連絡</p><div class="list">${comments.map(f=>`<div><b>${esc(f.name)}家</b><br><span style="font-size:14px">${esc(D.answers[f.id].comment)}</span></div>`).join("")}</div></div>`:""}
     <div class="row" style="margin-top:4px"><p class="sec">イベント（${D.events.length}件）</p><button class="btn small" data-act="addEv">＋ イベントを追加</button></div>
@@ -748,7 +761,8 @@ function viewAdmin(){
     ${evCard}
   </div>`;
 }
-function remindText(not){const evs=sortedEvents();return `【配車アンケート】${evs.map(e=>`${dShort(e.date)} ${e.title}`).join("／")}\nまだ回答していない家庭：${not.map(f=>f.name+"家").join("、")}\n${D.deadline?`締切は${dLabel(D.deadline)}です。`:""}アプリから回答お願いします！`}
+function remindText(){const lines=upcomingEvents().map(e=>{const no=evUnanswered(e);return no.length?`・${dShort(e.date)} ${e.title||"イベント"}：${no.map(f=>f.name+"家").join("、")}`:""}).filter(Boolean);
+  return `【配車アンケート】まだ回答していない家庭\n${lines.join("\n")}\n${D.deadline?`締切は${dLabel(D.deadline)}です。`:""}アプリから回答お願いします！\n${appURL()}`}
 function gradeSelect(m){return `<select data-ch="mem" data-id="${m.id}" data-k="grade" aria-label="${esc(m.name)}の学年">${GRADES.map(g=>`<option value="${g.v}" ${m.grade===g.v?"selected":""}>${g.l}</option>`).join("")}</select>`}
 function viewRoster(){
   const famHTML=D.families.map((f,fi)=>{
@@ -874,7 +888,7 @@ const acts={
   closeImg(){ui.img=null;render()},
   modalCancel(){ui.modal=null;render()},
   modalOk(){const ok=ui.modal.ok;ui.modal=null;fresh();ok();render()},
-  copyRemind(){const txt=remindText(D.families.filter(f=>!D.answers[f.id]));
+  copyRemind(){const txt=remindText();
     // 1) old-style copy inside the tap (works in most in-app browsers), 2) clipboard API, 3) ask to long-press the text
     let ok=false;try{const ta=document.createElement("textarea");ta.value=txt;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;opacity:0;font-size:16px";document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,txt.length);ok=document.execCommand("copy");ta.remove()}catch(e){}
     if(ok){toast("コピーしました。LINEに貼ってね");return}
